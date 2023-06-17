@@ -14,6 +14,11 @@ func pathRole(b *backend) []*framework.Path {
 		{
 			Pattern: "role/" + framework.GenericNameRegex("name"),
 			Fields: map[string]*framework.FieldSchema{
+				"name": {
+					Type:        framework.TypeLowerCaseString,
+					Description: "Name of the role",
+					Required:    true,
+				},
 				"namespace": {
 					Type:     framework.TypeLowerCaseString,
 					Required: true,
@@ -71,6 +76,7 @@ func (b *backend) pathRolesList(ctx context.Context, req *logical.Request, d *fr
 }
 
 func (b *backend) pathRolesRead(ctx context.Context, req *logical.Request, d *framework.FieldData) (*logical.Response, error) {
+	blog.Info(d.Get("name").(string))
 	entry, err := b.getRole(ctx, req.Storage, d.Get("name").(string))
 	if err != nil {
 		return nil, err
@@ -142,11 +148,14 @@ func (b *backend) pathRolesDelete(ctx context.Context, req *logical.Request, d *
 }
 
 func (b *backend) getRole(ctx context.Context, s logical.Storage, name string) (*model.RoleEntry, error) {
+	blog.Info(name)
 	if name == "" {
 		return nil, fmt.Errorf("missing role name")
 	}
 
 	entry, err := s.Get(ctx, "role/"+name)
+	blog.Info(entry.Key)
+	blog.Info(string(entry.Value))
 	if err != nil {
 		return nil, err
 	}
@@ -162,7 +171,7 @@ func (b *backend) getRole(ctx context.Context, s logical.Storage, name string) (
 	return &role, nil
 }
 func setRole(ctx context.Context, s logical.Storage, roleEntry *model.RoleEntry) error {
-	entry, err := logical.StorageEntryJSON("role/", roleEntry.RoleName())
+	entry, err := logical.StorageEntryJSON("role/"+roleEntry.RoleName(), roleEntry)
 	if err != nil {
 		return err
 	}
