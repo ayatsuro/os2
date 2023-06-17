@@ -57,8 +57,6 @@ func (e *ecsClient) onboardNamespace(namespace, username string) *EcsError {
 	if err := e.API("GET", path, nil, nil, &allUsers); err != nil {
 		return err
 	}
-	debug, _ := json.Marshal(allUsers)
-	blog.Info(string(debug))
 	found = false
 	for _, user := range allUsers.ListUsersResult.Users {
 		blog.Info(user.UserName + " " + username)
@@ -70,6 +68,15 @@ func (e *ecsClient) onboardNamespace(namespace, username string) *EcsError {
 	if found {
 		return newError(400, "iam user "+username+" already exists")
 	}
+	// 3. create the access key
+	var key model.CreateAccessKey
+	path = "/iam?Action=CreateAccessKey&UserName=" + username
+	if err := e.API("POST", path, nil, nil, &key); err != nil {
+		return err
+	}
+	// 4. create the role
+	debug, _ := json.Marshal(key)
+	blog.Info(string(debug))
 	blog.Info("namespace "+namespace, username+"onboarded")
 	return nil
 }

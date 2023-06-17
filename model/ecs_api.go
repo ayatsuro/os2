@@ -19,3 +19,17 @@ type IamUsers struct {
 type IamUser struct {
 	UserName string `json:"UserName"`
 }
+
+type AccessKey struct {
+	AccessKeyId     string `json:"AccessKeyId"`
+	UserName        string `json:"UserName"`
+	SecretAccessKey string `json:"SecretAccessKey,omitempty"`
+}
+
+type CreateAccessKey struct {
+	CreateAccessKeyResult CreateAccessKeyResult `json:"CreateAccessKeyResult"`
+}
+
+type CreateAccessKeyResult struct {
+	AccessKey AccessKey `json:"AccessKey"`
+}
