@@ -54,8 +54,12 @@ func (b *backend) pathNamespaceWrite(ctx context.Context, req *logical.Request, 
 	if err != nil {
 		return nil, err
 	}
-	if err := client.onboardNamespace(namespace.(string), username.(string)); err != nil {
+	roleEntry, err := client.onboardNamespace(namespace.(string), username.(string))
+	if err != nil {
 		return logical.ErrorResponse(err.Error()), nil
+	}
+	if err := setRole(ctx, req.Storage, &roleEntry); err != nil {
+
 	}
 	resp := &logical.Response{
 		Data: map[string]interface{}{

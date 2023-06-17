@@ -33,13 +33,13 @@ func newClient(config *model.PluginConfig) (*ecsClient, error) {
 	return client, nil
 }
 
-func (e *ecsClient) onboardNamespace(namespace, username string) *EcsError {
-	blog.Info("onboarding namespace " + namespace)
+func (e *ecsClient) onboardNamespace(namespace, username string) (model.RoleEntry, *EcsError) {
+	var roleEntry model.RoleEntry
 	// 1. check the namespace exists
 	var allNs model.Namespaces
 	path := "/object/namespaces.json"
 	if err := e.API("GET", path, nil, nil, &allNs); err != nil {
-		return err
+		return roleEntry, err
 	}
 	found := false
 	for _, ns := range allNs.Namespace {
@@ -49,13 +49,13 @@ func (e *ecsClient) onboardNamespace(namespace, username string) *EcsError {
 		}
 	}
 	if !found {
-		return newError(404, "namespace "+namespace+" not found")
+		return roleEntry, newError(404, "namespace "+namespace+" not found")
 	}
 	// 2. check the IAM user does not exist
 	var allUsers model.ListIamUsers
 	path = "/iam?Action=ListUsers"
 	if err := e.API("GET", path, nil, nil, &allUsers); err != nil {
-		return err
+		return roleEntry, err
 	}
 	found = false
 	for _, user := range allUsers.ListUsersResult.Users {
@@ -66,19 +66,15 @@ func (e *ecsClient) onboardNamespace(namespace, username string) *EcsError {
 		}
 	}
 	if found {
-		return newError(400, "iam user "+username+" already exists")
+		return roleEntry, newError(400, "iam user "+username+" already exists")
 	}
 	// 3. create the access key
 	var key model.CreateAccessKey
 	path = "/iam?Action=CreateAccessKey&UserName=" + username
 	if err := e.API("POST", path, nil, nil, &key); err != nil {
-		return err
+		return roleEntry, err
 	}
-	// 4. create the role
-	debug, _ := json.Marshal(key)
-	blog.Info(string(debug))
-	blog.Info("namespace "+namespace, username+"onboarded")
-	return nil
+	return key.CreateAccessKeyResult.AccessKey.ToRoleEntry(namespace), nil
 }
 
 func (e *ecsClient) deleteNamespace(name string) error {

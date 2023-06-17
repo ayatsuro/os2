@@ -26,6 +26,17 @@ type AccessKey struct {
 	SecretAccessKey string `json:"SecretAccessKey,omitempty"`
 }
 
+func (k AccessKey) ToRoleEntry(ns string) RoleEntry {
+	return RoleEntry{
+		Username:        k.UserName,
+		AccessKeyId:     k.AccessKeyId,
+		SecretAccessKey: k.SecretAccessKey,
+		Namespace:       ns,
+		TTL:             0,
+		MaxTTL:          0,
+	}
+}
+
 type CreateAccessKey struct {
 	CreateAccessKeyResult CreateAccessKeyResult `json:"CreateAccessKeyResult"`
 }
