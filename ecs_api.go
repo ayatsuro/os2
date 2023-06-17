@@ -33,12 +33,14 @@ func newClient(config *model.PluginConfig) (*ecsClient, error) {
 	return client, nil
 }
 
-func (e *ecsClient) onboardNamespace(namespace, username string) (model.RoleEntry, *EcsError) {
-	var roleEntry model.RoleEntry
+func (e *ecsClient) onboardNamespace(namespace, username string) (*model.RoleEntry, error) {
+	blog.Info("onboard " + namespace + " " + username)
+	var roleEntry *model.RoleEntry
 	// 1. check the namespace exists
 	var allNs model.Namespaces
 	path := "/object/namespaces.json"
 	if err := e.API("GET", path, nil, nil, &allNs); err != nil {
+		blog.Error(err.Error())
 		return roleEntry, err
 	}
 	found := false
@@ -49,7 +51,7 @@ func (e *ecsClient) onboardNamespace(namespace, username string) (model.RoleEntr
 		}
 	}
 	if !found {
-		return roleEntry, newError(404, "namespace "+namespace+" not found")
+		return roleEntry, errors.New("namespace " + namespace + " not found")
 	}
 	// 2. check the IAM user does not exist
 	var allUsers model.ListIamUsers
@@ -59,22 +61,24 @@ func (e *ecsClient) onboardNamespace(namespace, username string) (model.RoleEntr
 	}
 	found = false
 	for _, user := range allUsers.ListUsersResult.Users {
-		blog.Info(user.UserName + " " + username)
 		if strings.ToLower(user.UserName) == username {
 			found = true
 			break
 		}
 	}
 	if found {
-		return roleEntry, newError(400, "iam user "+username+" already exists")
+		return roleEntry, errors.New("iam user " + username + " already exists")
 	}
 	// 3. create the access key
 	var key model.CreateAccessKey
 	path = "/iam?Action=CreateAccessKey&UserName=" + username
 	if err := e.API("POST", path, nil, nil, &key); err != nil {
+		blog.Error(err.Error())
 		return roleEntry, err
 	}
-	return key.CreateAccessKeyResult.AccessKey.ToRoleEntry(namespace), nil
+	roleEntry = key.CreateAccessKeyResult.AccessKey.ToRoleEntry(namespace)
+	debug(roleEntry)
+	return roleEntry, nil
 }
 
 func (e *ecsClient) deleteNamespace(name string) error {
@@ -110,7 +114,7 @@ func (e *ecsClient) login() error {
 	return nil
 }
 
-func (e *ecsClient) API(method, path string, headers http.Header, data any, obj any) *EcsError {
+func (e *ecsClient) API(method, path string, headers http.Header, data any, obj any) error {
 	if !strings.HasPrefix(path, "http") {
 		path = e.url + path
 	}
@@ -129,29 +133,29 @@ func (e *ecsClient) API(method, path string, headers http.Header, data any, obj 
 	req.Header.Add("Content-Type", "application/json; charset=UTF-8")
 	resp, err := e.client.Do(req)
 	if err != nil {
-		return newError(500, "reaching ECS "+err.Error())
+		return err
 	}
 	// if token has expired, we login again
 	if resp.StatusCode == 401 {
 		if err := e.login(); err != nil {
-			return newError(500, "login to ECS "+err.Error())
+			return err
 		}
 		req.Header.Set("X-SDS-AUTH-TOKEN", e.token)
 		resp, err = e.client.Do(req)
 		if err != nil {
-			return newError(500, "reaching ECS "+err.Error())
+			return err
 		}
 	}
 
 	defer resp.Body.Close()
 	bodyByte, err := io.ReadAll(resp.Body)
 	if resp.StatusCode > 300 {
-		return newError(resp.StatusCode, string(bodyByte))
+		return errors.New(strconv.Itoa(resp.StatusCode) + " " + string(bodyByte))
 	}
 
 	if len(bodyByte) > 0 && obj != nil {
 		if err = json.Unmarshal(bodyByte, &obj); err != nil {
-			return newError(500, "unmarshalling ECS response "+err.Error())
+			return err
 		}
 	}
 	return nil

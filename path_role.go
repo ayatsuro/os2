@@ -8,6 +8,7 @@ import (
 )
 
 func setRole(ctx context.Context, s logical.Storage, roleEntry *model.RoleEntry) error {
+	blog.Info("storing role " + roleEntry.RoleName())
 	entry, err := logical.StorageEntryJSON("role/", roleEntry.RoleName())
 	if err != nil {
 		return err
@@ -16,7 +17,7 @@ func setRole(ctx context.Context, s logical.Storage, roleEntry *model.RoleEntry)
 	if entry == nil {
 		return fmt.Errorf("failed to create storage entry for role")
 	}
-
+	blog.Info("putting role")
 	if err := s.Put(ctx, entry); err != nil {
 		return err
 	}
