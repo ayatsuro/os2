@@ -45,7 +45,7 @@ func PathConfig(b *backend) *framework.Path {
 			},
 			"skip_ssl": {
 				Type:        framework.TypeBool,
-				Description: "whether to skip or not ssl verify",
+				Description: "whether to skip or not ssl verify when accessing dell ecs api",
 				Required:    true,
 				DisplayAttrs: &framework.DisplayAttributes{
 					Name:      "skip_ssl",

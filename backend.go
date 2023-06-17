@@ -41,10 +41,10 @@ func Factory(ctx context.Context, conf *logical.BackendConfig) (logical.Backend,
 func newBackend() *backend {
 	b := &backend{}
 	b.Backend = &framework.Backend{
-		//Help:        strings.TrimSpace("this is an SOS to the world"),
 		BackendType: logical.TypeLogical,
 		Paths: framework.PathAppend(
-			Namespace(b),
+			pathNamespace(b),
+			pathRole(b),
 			[]*framework.Path{PathConfig(b)}),
 		Invalidate: b.invalidate,
 		PathsSpecial: &logical.Paths{

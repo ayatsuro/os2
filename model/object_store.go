@@ -17,6 +17,7 @@ func (r *RoleEntry) ToResponseData() map[string]interface{} {
 		"max_ttl":       r.MaxTTL.Seconds(),
 		"username":      r.Username,
 		"access_key_id": r.AccessKeyId,
+		"namespace":     r.Namespace,
 	}
 	return respData
 }

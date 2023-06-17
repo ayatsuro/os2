@@ -34,13 +34,11 @@ func newClient(config *model.PluginConfig) (*ecsClient, error) {
 }
 
 func (e *ecsClient) onboardNamespace(namespace, username string) (*model.RoleEntry, error) {
-	blog.Info("onboard " + namespace + " " + username)
 	var roleEntry *model.RoleEntry
 	// 1. check the namespace exists
 	var allNs model.Namespaces
 	path := "/object/namespaces.json"
 	if err := e.API("GET", path, nil, nil, &allNs); err != nil {
-		blog.Error(err.Error())
 		return roleEntry, err
 	}
 	found := false
@@ -73,11 +71,9 @@ func (e *ecsClient) onboardNamespace(namespace, username string) (*model.RoleEnt
 	var key model.CreateAccessKey
 	path = "/iam?Action=CreateAccessKey&UserName=" + username
 	if err := e.API("POST", path, nil, nil, &key); err != nil {
-		blog.Error(err.Error())
 		return roleEntry, err
 	}
 	roleEntry = key.CreateAccessKeyResult.AccessKey.ToRoleEntry(namespace)
-	debug(roleEntry)
 	return roleEntry, nil
 }
 
