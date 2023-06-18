@@ -13,6 +13,8 @@ import (
 	"strings"
 )
 
+const nsHeaderName = "x-emc-namespace"
+
 type ecsClient struct {
 	client   *http.Client
 	username string
@@ -52,9 +54,10 @@ func (e *ecsClient) onboardNamespace(namespace, username string) (*model.Role, e
 		return roleEntry, errors.New("namespace " + namespace + " not found")
 	}
 	// 2. check the IAM user does not exist
+	header := http.Header{nsHeaderName: {namespace}}
 	var allUsers model.ListIamUsers
 	path = "/iam?Action=ListUsers"
-	if err := e.API("GET", path, nil, nil, &allUsers); err != nil {
+	if err := e.API("GET", path, header, nil, &allUsers); err != nil {
 		return roleEntry, err
 	}
 	found = false
@@ -69,8 +72,9 @@ func (e *ecsClient) onboardNamespace(namespace, username string) (*model.Role, e
 	}
 	// 3. create the access key
 	var key model.CreateAccessKey
+
 	path = "/iam?Action=CreateAccessKey&UserName=" + username
-	if err := e.API("POST", path, nil, nil, &key); err != nil {
+	if err := e.API("POST", path, header, nil, &key); err != nil {
 		return roleEntry, err
 	}
 	roleEntry = key.CreateAccessKeyResult.AccessKey.ToRoleEntry(namespace)
@@ -78,13 +82,12 @@ func (e *ecsClient) onboardNamespace(namespace, username string) (*model.Role, e
 }
 
 func (e *ecsClient) deleteNamespace(name string) error {
-	// TODO delete role in vault!
 	path := "/object/namespaces/namespace/" + name + "/deactivate.json"
 	return e.API("POST", path, nil, nil, nil)
 }
 
 func (e *ecsClient) deleteAccessKey(namespace, username, accessKeyId string) error {
-	header := http.Header{"x-emc-namespace": {namespace}}
+	header := http.Header{nsHeaderName: {namespace}}
 	path := "/iam?Action=DeleteAccessKey&UserName=" + username + "&AccessKeyId=" + accessKeyId
 	return e.API("POST", path, header, nil, nil)
 }

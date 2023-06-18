@@ -2,6 +2,7 @@ package os2
 
 import (
 	"context"
+	"fmt"
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/logical"
 	"golang.org/x/exp/slices"
@@ -11,7 +12,7 @@ import (
 func pathNamespace(b *backend) []*framework.Path {
 	return []*framework.Path{
 		{
-			Pattern: "namespace/onboard",
+			Pattern: "namespace/onboard" + framework.GenericNameRegex("namespace"),
 			Fields: map[string]*framework.FieldSchema{
 				"namespace": {
 					Type:        framework.TypeLowerCaseString,
@@ -30,6 +31,9 @@ func pathNamespace(b *backend) []*framework.Path {
 				},
 				logical.UpdateOperation: &framework.PathOperation{
 					Callback: b.pathNamespaceWrite,
+				},
+				logical.DeleteOperation: &framework.PathOperation{
+					Callback: b.pathNamespaceDelete,
 				},
 			},
 		},
@@ -69,7 +73,6 @@ func (b *backend) pathNamespaceWrite(ctx context.Context, req *logical.Request, 
 }
 
 func (b *backend) pathNamespacesList(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-	blog.Info("hello")
 	entries, err := req.Storage.List(ctx, "role/")
 	var dedup []string
 	if err != nil {
@@ -82,6 +85,32 @@ func (b *backend) pathNamespacesList(ctx context.Context, req *logical.Request, 
 		}
 	}
 	return logical.ListResponse(dedup), nil
+}
+
+func (b *backend) pathNamespaceDelete(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+	ns := data.Get("namespace").(string)
+	// 1. delete all roles
+	roles, err := req.Storage.List(ctx, "role/")
+	if err != nil {
+		return nil, fmt.Errorf("error in deleting namepace %w", err)
+	}
+	for _, role := range roles {
+		if strings.HasPrefix(role, ns+"_") {
+			err = req.Storage.Delete(ctx, "role/"+role)
+			if err != nil {
+				return nil, fmt.Errorf("error deleting namespacde: %w", err)
+			}
+		}
+	}
+	// 2. delete ns in ECS
+	client, err := b.getClient(ctx, req.Storage)
+	if err != nil {
+		return nil, fmt.Errorf("error in deleting namepace %w", err)
+	}
+	if err := client.deleteNamespace(ns); err != nil {
+		return nil, fmt.Errorf("error in deleting namepace %w", err)
+	}
+	return nil, nil
 }
 
 func (b *backend) pathNamespaceUpdate(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {

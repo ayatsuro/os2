@@ -6,7 +6,6 @@ import (
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/logical"
 	"os2/model"
-	"time"
 )
 
 func pathRole(b *backend) []*framework.Path {
@@ -43,12 +42,6 @@ func pathRole(b *backend) []*framework.Path {
 			Operations: map[logical.Operation]framework.OperationHandler{
 				logical.ReadOperation: &framework.PathOperation{
 					Callback: b.pathRolesRead,
-				},
-				logical.CreateOperation: &framework.PathOperation{
-					Callback: b.pathRolesWrite,
-				},
-				logical.UpdateOperation: &framework.PathOperation{
-					Callback: b.pathRolesWrite,
 				},
 				logical.DeleteOperation: &framework.PathOperation{
 					Callback: b.pathRolesDelete,
@@ -89,52 +82,6 @@ func (b *backend) pathRolesRead(ctx context.Context, req *logical.Request, d *fr
 	return &logical.Response{
 		Data: entry.ToResponseData(),
 	}, nil
-}
-
-func (b *backend) pathRolesWrite(ctx context.Context, req *logical.Request, d *framework.FieldData) (*logical.Response, error) {
-	name, ok := d.GetOk("name")
-	if !ok {
-		return logical.ErrorResponse("missing role name"), nil
-	}
-
-	roleEntry, err := b.getRole(ctx, req.Storage, name.(string))
-	if err != nil {
-		return nil, err
-	}
-
-	if roleEntry == nil {
-		roleEntry = &model.Role{}
-	}
-
-	createOperation := (req.Operation == logical.CreateOperation)
-
-	if username, ok := d.GetOk("username"); ok {
-		roleEntry.Username = username.(string)
-	} else if !ok && createOperation {
-		return nil, fmt.Errorf("missing username in role")
-	}
-
-	if ttlRaw, ok := d.GetOk("ttl"); ok {
-		roleEntry.TTL = time.Duration(ttlRaw.(int)) * time.Second
-	} else if createOperation {
-		roleEntry.TTL = time.Duration(d.Get("ttl").(int)) * time.Second
-	}
-
-	if maxTTLRaw, ok := d.GetOk("max_ttl"); ok {
-		roleEntry.MaxTTL = time.Duration(maxTTLRaw.(int)) * time.Second
-	} else if createOperation {
-		roleEntry.MaxTTL = time.Duration(d.Get("max_ttl").(int)) * time.Second
-	}
-
-	if roleEntry.MaxTTL != 0 && roleEntry.TTL > roleEntry.MaxTTL {
-		return logical.ErrorResponse("ttl cannot be greater than max_ttl"), nil
-	}
-
-	if err := setRole(ctx, req.Storage, roleEntry); err != nil {
-		return nil, err
-	}
-
-	return nil, nil
 }
 
 // pathRolesDelete makes a request to Vault storage to delete a role
