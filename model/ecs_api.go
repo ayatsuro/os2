@@ -44,3 +44,20 @@ type CreateAccessKey struct {
 type CreateAccessKeyResult struct {
 	AccessKey AccessKey `json:"AccessKey"`
 }
+
+type ListAccessKeys struct {
+	ListAccessKeysResult ListAccessKeysResult `json:"ListAccessKeysResult"`
+}
+
+type ListAccessKeysResult struct {
+	AccessKeyMetadata []AccessKey `json:"AccessKeyMetadata"`
+}
+
+type NativeUsers struct {
+	Users []NativeUser `json:"blobuser"`
+}
+
+type NativeUser struct {
+	Userid string `json:"userid,omitempty"`
+	Name   string `json:"name,omitempty"`
+}

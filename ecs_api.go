@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"os2/model"
@@ -13,7 +14,11 @@ import (
 	"strings"
 )
 
-const nsHeaderName = "x-emc-namespace"
+const (
+	nsHeaderName = "x-emc-namespace"
+	GET          = "GET"
+	POST         = "POST"
+)
 
 type ecsClient struct {
 	client   *http.Client
@@ -36,21 +41,19 @@ func newClient(config *model.PluginConfig) (*ecsClient, error) {
 }
 
 func (e *ecsClient) onboardNamespace(namespace, username string) (*model.Role, error) {
-	var role *model.Role
 	// 1. check the namespace exists
 	found, err := e.checkNsExists(namespace)
 	if err != nil {
-		return role, err
+		return nil, err
 	}
 	if !found {
-		return role, errors.New("namespace " + namespace + " not found")
+		return nil, errors.New("namespace " + namespace + " not found")
 	}
 	// 2. check the IAM user does not exist
-	header := http.Header{nsHeaderName: {namespace}}
 	var allUsers model.ListIamUsers
 	path := "/iam?Action=ListUsers"
-	if err := e.API("GET", path, header, nil, &allUsers); err != nil {
-		return role, err
+	if err := e.API(GET, path, namespace, nil, &allUsers); err != nil {
+		return nil, err
 	}
 	found = false
 	for _, user := range allUsers.ListUsersResult.Users {
@@ -60,48 +63,90 @@ func (e *ecsClient) onboardNamespace(namespace, username string) (*model.Role, e
 		}
 	}
 	if found {
-		return role, errors.New("iam user " + username + " already exists")
+		return nil, errors.New("iam user " + username + " already exists")
 	}
 	// 3. create the access key
-	var key model.CreateAccessKey
-	path = "/iam?Action=CreateAccessKey&UserName=" + username
-	if err := e.API("POST", path, header, nil, &key); err != nil {
-		return role, err
-	}
-	role = key.CreateAccessKeyResult.AccessKey.ToRoleEntry(namespace)
-	return role, nil
+	return e.createAccessKey(namespace, username)
+
 }
 
 func (e *ecsClient) migrateNamespace(namespace string) ([]*model.Role, error) {
-	var roles []*model.Role
 	// 1. check the namespace exists
 	found, err := e.checkNsExists(namespace)
 	if err != nil {
-		return roles, err
+		return nil, err
 	}
 	if !found {
-		return roles, errors.New("namespace " + namespace + " not found")
+		return nil, errors.New("namespace " + namespace + " not found")
 	}
-	// 2. list iam users, and for each of them check there is only access key
+	// 2. list iam users, and for each of them check there is only 1 access key
 	//    if only one access key, create a new access key
-	header := http.Header{nsHeaderName: {namespace}}
 	var allUsers model.ListIamUsers
 	path := "/iam?Action=ListUsers"
-	if err := e.API("GET", path, header, nil, &allUsers); err != nil {
-		return roles, err
+	if err := e.API(GET, path, namespace, nil, &allUsers); err != nil {
+		return nil, err
 	}
+	var roles []*model.Role
 	for _, user := range allUsers.ListUsersResult.Users {
-
+		var accessKeys model.ListAccessKeys
+		path := "/iam?Action=ListAccessKeys&UserName=" + user.UserName
+		if err := e.API(POST, path, namespace, nil, accessKeys); err != nil {
+			return nil, err
+		}
+		if len(accessKeys.ListAccessKeysResult.AccessKeyMetadata) > 1 {
+			return nil, fmt.Errorf("more than 1 access key for user %v", user.UserName)
+		}
+		role, err := e.createAccessKey(namespace, user.UserName)
+		if err != nil {
+			return nil, err
+		}
+		roles = append(roles, role)
 	}
 	// 3 list native users, and if not found in iam users, create an iam user and its access key
+	path = "/object/users/" + namespace + ".json"
+	var nativeUsers model.NativeUsers
+	if err := e.API(GET, path, "", nil, &nativeUsers); err != nil {
+		return nil, err
+	}
+	users := nativeUsers.Users
+	for i, user := range users {
+		path := "/object/users/" + user.Userid + "/info.json"
+		if err := e.API(GET, path, "", nil, &users[i]); err != nil {
+			return nil, err
+		}
+		found := false
+		for _, role := range roles {
+			if role.Username == users[i].Name {
+				found = true
+				break
+			}
+		}
+		if !found {
+			role, err := e.createAccessKey(namespace, users[i].Name)
+			if err != nil {
+				return nil, err
+			}
+			roles = append(roles, role)
+		}
 
-	return nil, nil
+	}
+	return roles, nil
+}
+
+func (e *ecsClient) createAccessKey(namespace, username string) (*model.Role, error) {
+	var key model.CreateAccessKey
+	path := "/iam?Action=CreateAccessKey&UserName=" + username
+	if err := e.API(POST, path, namespace, nil, &key); err != nil {
+		return nil, err
+	}
+	role := key.CreateAccessKeyResult.AccessKey.ToRoleEntry(namespace)
+	return role, nil
 }
 
 func (e *ecsClient) checkNsExists(name string) (bool, error) {
 	var allNs model.Namespaces
 	path := "/object/namespaces.json"
-	if err := e.API("GET", path, nil, nil, &allNs); err != nil {
+	if err := e.API(GET, path, "", nil, &allNs); err != nil {
 		return false, err
 	}
 	for _, ns := range allNs.Namespace {
@@ -114,17 +159,16 @@ func (e *ecsClient) checkNsExists(name string) (bool, error) {
 
 func (e *ecsClient) deleteNamespace(name string) error {
 	path := "/object/namespaces/namespace/" + name + "/deactivate.json"
-	return e.API("POST", path, nil, nil, nil)
+	return e.API(POST, path, "", nil, nil)
 }
 
 func (e *ecsClient) deleteAccessKey(namespace, username, accessKeyId string) error {
-	header := http.Header{nsHeaderName: {namespace}}
 	path := "/iam?Action=DeleteAccessKey&UserName=" + username + "&AccessKeyId=" + accessKeyId
-	return e.API("POST", path, header, nil, nil)
+	return e.API(POST, path, namespace, nil, nil)
 }
 
 func (e *ecsClient) login() error {
-	req, err := http.NewRequest("GET", e.url+"/login", nil)
+	req, err := http.NewRequest(GET, e.url+"/login", nil)
 	if err != nil {
 		return err
 	}
@@ -151,7 +195,7 @@ func (e *ecsClient) login() error {
 	return nil
 }
 
-func (e *ecsClient) API(method, path string, headers http.Header, data any, obj any) error {
+func (e *ecsClient) API(method, path, namespace string, data any, obj any) error {
 	if !strings.HasPrefix(path, "http") {
 		path = e.url + path
 	}
@@ -163,8 +207,8 @@ func (e *ecsClient) API(method, path string, headers http.Header, data any, obj 
 		req, _ = http.NewRequest(method, path, nil)
 	}
 
-	if headers != nil {
-		req.Header = headers
+	if namespace != "" {
+		req.Header = http.Header{nsHeaderName: {namespace}}
 	}
 	req.Header.Add("X-SDS-AUTH-TOKEN", e.token)
 	req.Header.Add("Content-Type", "application/json; charset=UTF-8")
