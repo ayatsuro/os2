@@ -78,8 +78,15 @@ func (e *ecsClient) onboardNamespace(namespace, username string) (*model.Role, e
 }
 
 func (e *ecsClient) deleteNamespace(name string) error {
+	// TODO delete role in vault!
 	path := "/object/namespaces/namespace/" + name + "/deactivate.json"
 	return e.API("POST", path, nil, nil, nil)
+}
+
+func (e *ecsClient) deleteAccessKey(namespace, username, accessKeyId string) error {
+	header := http.Header{"x-emc-namespace": {namespace}}
+	path := "/iam?Action=DeleteAccessKey&UserName=" + username + "&AccessKeyId=" + accessKeyId
+	return e.API("POST", path, header, nil, nil)
 }
 
 func (e *ecsClient) login() error {

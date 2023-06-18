@@ -22,7 +22,6 @@ type backend struct {
 
 var _ logical.Factory = Factory
 
-// Factory configures and returns Mock backends
 func Factory(ctx context.Context, conf *logical.BackendConfig) (logical.Backend, error) {
 	b := newBackend()
 

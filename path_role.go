@@ -138,12 +138,24 @@ func (b *backend) pathRolesWrite(ctx context.Context, req *logical.Request, d *f
 }
 
 // pathRolesDelete makes a request to Vault storage to delete a role
-func (b *backend) pathRolesDelete(ctx context.Context, req *logical.Request, d *framework.FieldData) (*logical.Response, error) {
-	err := req.Storage.Delete(ctx, "role/"+d.Get("name").(string))
+func (b *backend) pathRolesDelete(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+	roleName := data.Get("name").(string)
+	role, err := b.getRole(ctx, req.Storage, roleName)
 	if err != nil {
 		return nil, fmt.Errorf("error deleting role: %w", err)
 	}
+	err = req.Storage.Delete(ctx, "role/"+roleName)
+	if err != nil {
+		return nil, fmt.Errorf("error deleting role: %w", err)
+	}
+	client, err := b.getClient(ctx, req.Storage)
+	if err != nil {
+		return nil, fmt.Errorf("error deleting role: %w", err)
 
+	}
+	if err := client.deleteAccessKey(role.Namespace, role.Username, role.AccessKeyId); err != nil {
+		return nil, fmt.Errorf("error deleting role: %w", err)
+	}
 	return nil, nil
 }
 
