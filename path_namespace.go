@@ -2,7 +2,6 @@ package os2
 
 import (
 	"context"
-	"fmt"
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/logical"
 	"golang.org/x/exp/slices"
@@ -69,11 +68,11 @@ func pathNamespace(b *backend) []*framework.Path {
 func (b *backend) pathNamespaceMigrate(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	namespace, okName := data.GetOk("namespace")
 	if !okName {
-		return logical.ErrorResponse("fields namespace required"), nil
+		return logical.ErrorResponse("field namespace required"), nil
 	}
 	client, err := b.getClient(ctx, req.Storage)
 	if err != nil {
-		return nil, err
+		return logical.ErrorResponse(err.Error()), nil
 	}
 	roles, err := client.migrateNamespace(namespace.(string))
 	if err != nil {
@@ -82,7 +81,7 @@ func (b *backend) pathNamespaceMigrate(ctx context.Context, req *logical.Request
 	var roleNames []string
 	for _, role := range roles {
 		if err := setRole(ctx, req.Storage, role); err != nil {
-			return nil, err
+			return logical.ErrorResponse(err.Error()), nil
 		}
 		roleNames = append(roleNames, role.RoleName())
 	}
@@ -102,14 +101,14 @@ func (b *backend) pathNamespaceOnboard(ctx context.Context, req *logical.Request
 	}
 	client, err := b.getClient(ctx, req.Storage)
 	if err != nil {
-		return nil, err
+		return logical.ErrorResponse(err.Error()), nil
 	}
 	role, err := client.onboardNamespace(namespace.(string), username.(string))
 	if err != nil {
 		return logical.ErrorResponse(err.Error()), nil
 	}
 	if err := setRole(ctx, req.Storage, role); err != nil {
-		return nil, err
+		return logical.ErrorResponse(err.Error()), nil
 	}
 	resp := &logical.Response{
 		Data: map[string]interface{}{
@@ -122,7 +121,7 @@ func (b *backend) pathNamespacesList(ctx context.Context, req *logical.Request, 
 	entries, err := req.Storage.List(ctx, "role/")
 	var dedup []string
 	if err != nil {
-		return nil, err
+		return logical.ErrorResponse(err.Error()), nil
 	}
 	for _, entry := range entries {
 		ns, _, _ := strings.Cut(entry, "_")
@@ -138,28 +137,28 @@ func (b *backend) pathNamespaceDelete(ctx context.Context, req *logical.Request,
 	// 1. delete all roles
 	roles, err := req.Storage.List(ctx, "role/")
 	if err != nil {
-		return nil, fmt.Errorf("error in deleting namepace %w", err)
+		return logical.ErrorResponse(err.Error()), nil
 	}
 	for _, role := range roles {
 		if strings.HasPrefix(role, ns+"_") {
 			err = req.Storage.Delete(ctx, "role/"+role)
 			if err != nil {
-				return nil, fmt.Errorf("error deleting namespacde: %w", err)
+				return logical.ErrorResponse(err.Error()), nil
 			}
 		}
 	}
 	// 2. delete ns in ECS
 	client, err := b.getClient(ctx, req.Storage)
 	if err != nil {
-		return nil, fmt.Errorf("error in deleting namepace %w", err)
+		return logical.ErrorResponse(err.Error()), nil
 	}
 	if err := client.deleteNamespace(ns); err != nil {
-		return nil, fmt.Errorf("error in deleting namepace %w", err)
+		return logical.ErrorResponse(err.Error()), nil
 	}
 	return nil, nil
 }
 
 func (b *backend) pathNamespaceUpdate(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-	resp := logical.ErrorResponse("namespace cant' be updated")
+	resp := logical.ErrorResponse("namespace can't be updated")
 	return resp, nil
 }

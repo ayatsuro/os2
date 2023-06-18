@@ -47,6 +47,7 @@ func pathRole(b *backend) []*framework.Path {
 					Callback: b.pathRolesDelete,
 				},
 			},
+			ExistenceCheck: b.pathExistenceCheck,
 		},
 		{
 			Pattern: "role/?$",
@@ -62,7 +63,7 @@ func pathRole(b *backend) []*framework.Path {
 func (b *backend) pathRolesList(ctx context.Context, req *logical.Request, d *framework.FieldData) (*logical.Response, error) {
 	entries, err := req.Storage.List(ctx, "role/")
 	if err != nil {
-		return nil, err
+		return logical.ErrorResponse(err.Error()), nil
 	}
 
 	return logical.ListResponse(entries), nil
@@ -72,11 +73,11 @@ func (b *backend) pathRolesRead(ctx context.Context, req *logical.Request, d *fr
 	blog.Info(d.Get("name").(string))
 	entry, err := b.getRole(ctx, req.Storage, d.Get("name").(string))
 	if err != nil {
-		return nil, err
+		return logical.ErrorResponse(err.Error()), nil
 	}
 
 	if entry == nil {
-		return nil, nil
+		return logical.ErrorResponse(err.Error()), nil
 	}
 
 	return &logical.Response{
@@ -89,19 +90,19 @@ func (b *backend) pathRolesDelete(ctx context.Context, req *logical.Request, dat
 	roleName := data.Get("name").(string)
 	role, err := b.getRole(ctx, req.Storage, roleName)
 	if err != nil {
-		return nil, fmt.Errorf("error deleting role: %w", err)
+		return logical.ErrorResponse(err.Error()), nil
 	}
 	err = req.Storage.Delete(ctx, "role/"+roleName)
 	if err != nil {
-		return nil, fmt.Errorf("error deleting role: %w", err)
+		return logical.ErrorResponse(err.Error()), nil
 	}
 	client, err := b.getClient(ctx, req.Storage)
 	if err != nil {
-		return nil, fmt.Errorf("error deleting role: %w", err)
+		return logical.ErrorResponse(err.Error()), nil
 
 	}
 	if err := client.deleteAccessKey(role.Namespace, role.Username, role.AccessKeyId); err != nil {
-		return nil, fmt.Errorf("error deleting role: %w", err)
+		return logical.ErrorResponse(err.Error()), nil
 	}
 	return nil, nil
 }

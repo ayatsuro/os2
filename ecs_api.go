@@ -50,17 +50,9 @@ func (e *ecsClient) onboardNamespace(namespace, username string) (*model.Role, e
 		return nil, errors.New("namespace " + namespace + " not found")
 	}
 	// 2. check the IAM user does not exist
-	var allUsers model.ListIamUsers
-	path := "/iam?Action=ListUsers"
-	if err := e.API(GET, path, namespace, nil, &allUsers); err != nil {
+	found, err = e.checkIamUserExists(namespace, username)
+	if err != nil {
 		return nil, err
-	}
-	found = false
-	for _, user := range allUsers.ListUsersResult.Users {
-		if strings.ToLower(user.UserName) == username {
-			found = true
-			break
-		}
 	}
 	if found {
 		return nil, errors.New("iam user " + username + " already exists")
@@ -81,13 +73,12 @@ func (e *ecsClient) migrateNamespace(namespace string) ([]*model.Role, error) {
 	}
 	// 2. list iam users, and for each of them check there is only 1 access key
 	//    if only one access key, create a new access key
-	var allUsers model.ListIamUsers
-	path := "/iam?Action=ListUsers"
-	if err := e.API(GET, path, namespace, nil, &allUsers); err != nil {
+	users, err := e.getIamUsers(namespace)
+	if err != nil {
 		return nil, err
 	}
 	var roles []*model.Role
-	for _, user := range allUsers.ListUsersResult.Users {
+	for _, user := range users {
 		var accessKeys model.ListAccessKeys
 		path := "/iam?Action=ListAccessKeys&UserName=" + user.UserName
 		if err := e.API(POST, path, namespace, nil, accessKeys); err != nil {
@@ -103,26 +94,26 @@ func (e *ecsClient) migrateNamespace(namespace string) ([]*model.Role, error) {
 		roles = append(roles, role)
 	}
 	// 3 list native users, and if not found in iam users, create an iam user and its access key
-	path = "/object/users/" + namespace + ".json"
+	path := "/object/users/" + namespace + ".json"
 	var nativeUsers model.NativeUsers
 	if err := e.API(GET, path, "", nil, &nativeUsers); err != nil {
 		return nil, err
 	}
-	users := nativeUsers.Users
-	for i, user := range users {
+	nUsers := nativeUsers.Users
+	for i, user := range nUsers {
 		path := "/object/users/" + user.Userid + "/info.json"
-		if err := e.API(GET, path, "", nil, &users[i]); err != nil {
+		if err := e.API(GET, path, "", nil, &nUsers[i]); err != nil {
 			return nil, err
 		}
 		found := false
 		for _, role := range roles {
-			if role.Username == users[i].Name {
+			if role.Username == nUsers[i].Name {
 				found = true
 				break
 			}
 		}
 		if !found {
-			role, err := e.createAccessKey(namespace, users[i].Name)
+			role, err := e.createAccessKey(namespace, nUsers[i].Name)
 			if err != nil {
 				return nil, err
 			}
@@ -131,6 +122,40 @@ func (e *ecsClient) migrateNamespace(namespace string) ([]*model.Role, error) {
 
 	}
 	return roles, nil
+}
+
+func (e *ecsClient) onboardBrid(namespace, brid string) (*model.Role, error) {
+	// check the ns exists
+	found, err := e.checkNsExists(namespace)
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, errors.New("namespace not found")
+	}
+	// check brid not already exists
+
+}
+
+func (e *ecsClient) getIamUsers(namespace string) ([]model.IamUser, error) {
+	var allUsers model.ListIamUsers
+	path := "/iam?Action=ListUsers"
+	if err := e.API(GET, path, namespace, nil, &allUsers); err != nil {
+		return nil, err
+	}
+	return allUsers.ListUsersResult.Users, nil
+}
+func (e *ecsClient) checkIamUserExists(namespace, username string) (bool, error) {
+	users, err := e.getIamUsers(namespace)
+	if err != nil {
+		return false, err
+	}
+	for _, user := range users {
+		if strings.ToLower(user.UserName) == username {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (e *ecsClient) createAccessKey(namespace, username string) (*model.Role, error) {

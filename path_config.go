@@ -2,7 +2,6 @@ package os2
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os2/model"
 
@@ -64,7 +63,7 @@ func pathConfig(b *backend) *framework.Path {
 				Callback: b.pathConfigWrite,
 			},
 		},
-		ExistenceCheck:  b.pathConfigExistenceCheck,
+		ExistenceCheck:  b.pathExistenceCheck,
 		HelpSynopsis:    pathConfigHelpSynopsis,
 		HelpDescription: pathConfigHelpDescription,
 	}
@@ -73,7 +72,7 @@ func pathConfig(b *backend) *framework.Path {
 func (b *backend) pathConfigRead(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	config, err := GetConfig(ctx, req.Storage)
 	if err != nil {
-		return nil, err
+		return logical.ErrorResponse(err.Error()), nil
 	}
 	resp := &logical.Response{
 		Data: map[string]interface{}{
@@ -86,17 +85,11 @@ func (b *backend) pathConfigRead(ctx context.Context, req *logical.Request, data
 }
 
 func (b *backend) pathConfigWrite(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-	username, ok := data.GetOk("username")
-	if !ok {
-		return nil, errors.New("missing username")
-	}
-	password, ok := data.GetOk("password")
-	if !ok {
-		return nil, errors.New("missing password")
-	}
-	url, ok := data.GetOk("url")
-	if !ok {
-		return nil, errors.New("missing url")
+	username, okUser := data.GetOk("username")
+	password, okPwd := data.GetOk("password")
+	url, okUrl := data.GetOk("url")
+	if !okUser || !okPwd || !okUrl {
+		return logical.ErrorResponse("fields username, password and url are required"), nil
 	}
 	config := model.PluginConfig{
 		Username: username.(string),
@@ -106,7 +99,7 @@ func (b *backend) pathConfigWrite(ctx context.Context, req *logical.Request, dat
 	}
 	entry, err := logical.StorageEntryJSON(configStoragePath, &config)
 	if err != nil {
-		return nil, err
+		return logical.ErrorResponse(err.Error()), nil
 	}
 	if err := req.Storage.Put(ctx, entry); err != nil {
 		return nil, err
@@ -116,7 +109,7 @@ func (b *backend) pathConfigWrite(ctx context.Context, req *logical.Request, dat
 	return nil, nil
 }
 
-func (b *backend) pathConfigExistenceCheck(ctx context.Context, req *logical.Request, data *framework.FieldData) (bool, error) {
+func (b *backend) pathExistenceCheck(ctx context.Context, req *logical.Request, data *framework.FieldData) (bool, error) {
 	out, err := req.Storage.Get(ctx, req.Path)
 	if err != nil {
 		return false, fmt.Errorf("existence check failed: %w", err)
