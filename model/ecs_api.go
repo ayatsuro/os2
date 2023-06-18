@@ -26,8 +26,8 @@ type AccessKey struct {
 	SecretAccessKey string `json:"SecretAccessKey,omitempty"`
 }
 
-func (k AccessKey) ToRoleEntry(ns string) *RoleEntry {
-	return &RoleEntry{
+func (k AccessKey) ToRoleEntry(ns string) *Role {
+	return &Role{
 		Username:        k.UserName,
 		AccessKeyId:     k.AccessKeyId,
 		SecretAccessKey: k.SecretAccessKey,

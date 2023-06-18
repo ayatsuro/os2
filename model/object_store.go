@@ -2,7 +2,7 @@ package model
 
 import "time"
 
-type RoleEntry struct {
+type Role struct {
 	Username        string        `json:"username"`
 	AccessKeyId     string        `json:"access_key_id"`
 	SecretAccessKey string        `json:"secret_access_key"`
@@ -11,7 +11,7 @@ type RoleEntry struct {
 	MaxTTL          time.Duration `json:"max_ttl"`
 }
 
-func (r *RoleEntry) ToResponseData() map[string]interface{} {
+func (r *Role) ToResponseData() map[string]interface{} {
 	respData := map[string]interface{}{
 		"ttl":           r.TTL.Seconds(),
 		"max_ttl":       r.MaxTTL.Seconds(),
@@ -22,7 +22,7 @@ func (r *RoleEntry) ToResponseData() map[string]interface{} {
 	return respData
 }
 
-func (r *RoleEntry) RoleName() string {
+func (r *Role) RoleName() string {
 	return r.Namespace + "_" + r.Username + "_" + r.AccessKeyId
 
 }

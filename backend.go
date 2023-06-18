@@ -45,7 +45,7 @@ func newBackend() *backend {
 		Paths: framework.PathAppend(
 			pathNamespace(b),
 			pathRole(b),
-			[]*framework.Path{PathConfig(b)}),
+			[]*framework.Path{pathConfig(b), pathCreds(b)}),
 		Invalidate: b.invalidate,
 		PathsSpecial: &logical.Paths{
 			LocalStorage: []string{},
@@ -54,8 +54,10 @@ func newBackend() *backend {
 				"role/*",
 			},
 		},
+		Secrets: []*framework.Secret{
+			b.secretAccessKey(),
+		},
 	}
-
 	return b
 }
 

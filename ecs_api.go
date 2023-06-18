@@ -33,8 +33,8 @@ func newClient(config *model.PluginConfig) (*ecsClient, error) {
 	return client, nil
 }
 
-func (e *ecsClient) onboardNamespace(namespace, username string) (*model.RoleEntry, error) {
-	var roleEntry *model.RoleEntry
+func (e *ecsClient) onboardNamespace(namespace, username string) (*model.Role, error) {
+	var roleEntry *model.Role
 	// 1. check the namespace exists
 	var allNs model.Namespaces
 	path := "/object/namespaces.json"

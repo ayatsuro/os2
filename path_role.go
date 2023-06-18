@@ -103,7 +103,7 @@ func (b *backend) pathRolesWrite(ctx context.Context, req *logical.Request, d *f
 	}
 
 	if roleEntry == nil {
-		roleEntry = &model.RoleEntry{}
+		roleEntry = &model.Role{}
 	}
 
 	createOperation := (req.Operation == logical.CreateOperation)
@@ -147,7 +147,7 @@ func (b *backend) pathRolesDelete(ctx context.Context, req *logical.Request, d *
 	return nil, nil
 }
 
-func (b *backend) getRole(ctx context.Context, s logical.Storage, name string) (*model.RoleEntry, error) {
+func (b *backend) getRole(ctx context.Context, s logical.Storage, name string) (*model.Role, error) {
 	blog.Info(name)
 	if name == "" {
 		return nil, fmt.Errorf("missing role name")
@@ -164,13 +164,13 @@ func (b *backend) getRole(ctx context.Context, s logical.Storage, name string) (
 		return nil, nil
 	}
 
-	var role model.RoleEntry
+	var role model.Role
 	if err := entry.DecodeJSON(&role); err != nil {
 		return nil, err
 	}
 	return &role, nil
 }
-func setRole(ctx context.Context, s logical.Storage, roleEntry *model.RoleEntry) error {
+func setRole(ctx context.Context, s logical.Storage, roleEntry *model.Role) error {
 	entry, err := logical.StorageEntryJSON("role/"+roleEntry.RoleName(), roleEntry)
 	if err != nil {
 		return err

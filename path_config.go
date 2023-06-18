@@ -12,7 +12,7 @@ import (
 
 const configStoragePath = "config"
 
-func PathConfig(b *backend) *framework.Path {
+func pathConfig(b *backend) *framework.Path {
 	return &framework.Path{
 		Pattern: "config",
 		Fields: map[string]*framework.FieldSchema{
