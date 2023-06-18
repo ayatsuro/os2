@@ -36,29 +36,21 @@ func newClient(config *model.PluginConfig) (*ecsClient, error) {
 }
 
 func (e *ecsClient) onboardNamespace(namespace, username string) (*model.Role, error) {
-	var roleEntry *model.Role
+	var role *model.Role
 	// 1. check the namespace exists
-	var allNs model.Namespaces
-	path := "/object/namespaces.json"
-	if err := e.API("GET", path, nil, nil, &allNs); err != nil {
-		return roleEntry, err
-	}
-	found := false
-	for _, ns := range allNs.Namespace {
-		if strings.ToLower(ns.Name) == namespace {
-			found = true
-			break
-		}
+	found, err := e.checkNsExists(namespace)
+	if err != nil {
+		return role, err
 	}
 	if !found {
-		return roleEntry, errors.New("namespace " + namespace + " not found")
+		return role, errors.New("namespace " + namespace + " not found")
 	}
 	// 2. check the IAM user does not exist
 	header := http.Header{nsHeaderName: {namespace}}
 	var allUsers model.ListIamUsers
-	path = "/iam?Action=ListUsers"
+	path := "/iam?Action=ListUsers"
 	if err := e.API("GET", path, header, nil, &allUsers); err != nil {
-		return roleEntry, err
+		return role, err
 	}
 	found = false
 	for _, user := range allUsers.ListUsersResult.Users {
@@ -68,17 +60,56 @@ func (e *ecsClient) onboardNamespace(namespace, username string) (*model.Role, e
 		}
 	}
 	if found {
-		return roleEntry, errors.New("iam user " + username + " already exists")
+		return role, errors.New("iam user " + username + " already exists")
 	}
 	// 3. create the access key
 	var key model.CreateAccessKey
-
 	path = "/iam?Action=CreateAccessKey&UserName=" + username
 	if err := e.API("POST", path, header, nil, &key); err != nil {
-		return roleEntry, err
+		return role, err
 	}
-	roleEntry = key.CreateAccessKeyResult.AccessKey.ToRoleEntry(namespace)
-	return roleEntry, nil
+	role = key.CreateAccessKeyResult.AccessKey.ToRoleEntry(namespace)
+	return role, nil
+}
+
+func (e *ecsClient) migrateNamespace(namespace string) ([]*model.Role, error) {
+	var roles []*model.Role
+	// 1. check the namespace exists
+	found, err := e.checkNsExists(namespace)
+	if err != nil {
+		return roles, err
+	}
+	if !found {
+		return roles, errors.New("namespace " + namespace + " not found")
+	}
+	// 2. list iam users, and for each of them check there is only access key
+	//    if only one access key, create a new access key
+	header := http.Header{nsHeaderName: {namespace}}
+	var allUsers model.ListIamUsers
+	path := "/iam?Action=ListUsers"
+	if err := e.API("GET", path, header, nil, &allUsers); err != nil {
+		return roles, err
+	}
+	for _, user := range allUsers.ListUsersResult.Users {
+
+	}
+	// 3 list native users, and if not found in iam users, create an iam user and its access key
+
+	return nil, nil
+}
+
+func (e *ecsClient) checkNsExists(name string) (bool, error) {
+	var allNs model.Namespaces
+	path := "/object/namespaces.json"
+	if err := e.API("GET", path, nil, nil, &allNs); err != nil {
+		return false, err
+	}
+	for _, ns := range allNs.Namespace {
+		if strings.ToLower(ns.Name) == name {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (e *ecsClient) deleteNamespace(name string) error {

@@ -27,13 +27,31 @@ func pathNamespace(b *backend) []*framework.Path {
 			},
 			Operations: map[logical.Operation]framework.OperationHandler{
 				logical.CreateOperation: &framework.PathOperation{
-					Callback: b.pathNamespaceWrite,
+					Callback: b.pathNamespaceOnboard,
 				},
 				logical.UpdateOperation: &framework.PathOperation{
-					Callback: b.pathNamespaceWrite,
+					Callback: b.pathNamespaceOnboard,
 				},
 				logical.DeleteOperation: &framework.PathOperation{
 					Callback: b.pathNamespaceDelete,
+				},
+			},
+		},
+		{
+			Pattern: "namespace/migrate" + framework.GenericNameRegex("namespace"),
+			Fields: map[string]*framework.FieldSchema{
+				"namespace": {
+					Type:        framework.TypeLowerCaseString,
+					Description: "Name of the namespace",
+					Required:    true,
+				},
+			},
+			Operations: map[logical.Operation]framework.OperationHandler{
+				logical.CreateOperation: &framework.PathOperation{
+					Callback: b.pathNamespaceMigrate,
+				},
+				logical.UpdateOperation: &framework.PathOperation{
+					Callback: b.pathNamespaceMigrate,
 				},
 			},
 		},
@@ -48,21 +66,49 @@ func pathNamespace(b *backend) []*framework.Path {
 	}
 }
 
-func (b *backend) pathNamespaceWrite(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+func (b *backend) pathNamespaceMigrate(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	namespace, okName := data.GetOk("namespace")
-	username, okUsername := data.GetOk("username")
-	if !okName || !okUsername {
+	if !okName {
+		return logical.ErrorResponse("fields namespace required"), nil
+	}
+	client, err := b.getClient(ctx, req.Storage)
+	if err != nil {
+		return nil, err
+	}
+	roles, err := client.migrateNamespace(namespace.(string))
+	if err != nil {
+		return logical.ErrorResponse(err.Error()), nil
+	}
+	var roleNames []string
+	for _, role := range roles {
+		if err := setRole(ctx, req.Storage, role); err != nil {
+			return nil, err
+		}
+		roleNames = append(roleNames, role.RoleName())
+	}
+	resp := &logical.Response{
+		Data: map[string]interface{}{
+			"namespace migrated": namespace,
+			"roles migrated":     roleNames,
+		}}
+	return resp, nil
+}
+
+func (b *backend) pathNamespaceOnboard(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+	namespace, okName := data.GetOk("namespace")
+	username, okUser := data.GetOk("username")
+	if !okName || !okUser {
 		return logical.ErrorResponse("both fields namespace and username are required"), nil
 	}
 	client, err := b.getClient(ctx, req.Storage)
 	if err != nil {
 		return nil, err
 	}
-	roleEntry, err := client.onboardNamespace(namespace.(string), username.(string))
+	role, err := client.onboardNamespace(namespace.(string), username.(string))
 	if err != nil {
 		return logical.ErrorResponse(err.Error()), nil
 	}
-	if err := setRole(ctx, req.Storage, roleEntry); err != nil {
+	if err := setRole(ctx, req.Storage, role); err != nil {
 		return nil, err
 	}
 	resp := &logical.Response{
