@@ -24,5 +24,12 @@ func (r *Role) ToResponseData() map[string]interface{} {
 
 func (r *Role) RoleName() string {
 	return r.Namespace + "_" + r.Username + "_" + r.AccessKeyId
+}
 
+func ToResponseData(roles []*Role) map[string]string {
+	output := make(map[string]string)
+	for _, role := range roles {
+		output[role.Username] = role.AccessKeyId
+	}
+	return output
 }

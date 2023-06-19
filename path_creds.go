@@ -32,7 +32,7 @@ func pathCreds(b *backend) *framework.Path {
 func (b *backend) pathCredsRead(ctx context.Context, req *logical.Request, d *framework.FieldData) (*logical.Response, error) {
 	roleName := d.Get("name").(string)
 
-	role, err := b.getRole(ctx, req.Storage, roleName)
+	role, err := getRole(ctx, req.Storage, roleName)
 	if err != nil {
 		return logical.ErrorResponse(err.Error()), nil
 	}

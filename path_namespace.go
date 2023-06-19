@@ -5,6 +5,7 @@ import (
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/logical"
 	"golang.org/x/exp/slices"
+	"os2/model"
 	"strings"
 )
 
@@ -78,17 +79,16 @@ func (b *backend) pathNamespaceMigrate(ctx context.Context, req *logical.Request
 	if err != nil {
 		return logical.ErrorResponse(err.Error()), nil
 	}
-	var roleNames []string
+	// store the roles
 	for _, role := range roles {
 		if err := setRole(ctx, req.Storage, role); err != nil {
 			return logical.ErrorResponse(err.Error()), nil
 		}
-		roleNames = append(roleNames, role.RoleName())
 	}
 	resp := &logical.Response{
 		Data: map[string]interface{}{
-			"namespace migrated": namespace,
-			"roles migrated":     roleNames,
+			"message": "namespace migrated",
+			"users":   model.ToResponseData(roles),
 		}}
 	return resp, nil
 }
@@ -112,7 +112,9 @@ func (b *backend) pathNamespaceOnboard(ctx context.Context, req *logical.Request
 	}
 	resp := &logical.Response{
 		Data: map[string]interface{}{
-			"namespace created": namespace,
+			"message":       "namespace onboarded",
+			"username":      role.Username,
+			"access_key_id": role.AccessKeyId,
 		}}
 	return resp, nil
 }

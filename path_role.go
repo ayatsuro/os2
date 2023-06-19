@@ -61,17 +61,17 @@ func pathRole(b *backend) []*framework.Path {
 }
 
 func (b *backend) pathRolesList(ctx context.Context, req *logical.Request, d *framework.FieldData) (*logical.Response, error) {
-	entries, err := req.Storage.List(ctx, "role/")
+	roles, err := req.Storage.List(ctx, "role/")
 	if err != nil {
 		return logical.ErrorResponse(err.Error()), nil
 	}
 
-	return logical.ListResponse(entries), nil
+	return logical.ListResponse(roles), nil
 }
 
 func (b *backend) pathRolesRead(ctx context.Context, req *logical.Request, d *framework.FieldData) (*logical.Response, error) {
 	blog.Info(d.Get("name").(string))
-	entry, err := b.getRole(ctx, req.Storage, d.Get("name").(string))
+	entry, err := getRole(ctx, req.Storage, d.Get("name").(string))
 	if err != nil {
 		return logical.ErrorResponse(err.Error()), nil
 	}
@@ -88,7 +88,7 @@ func (b *backend) pathRolesRead(ctx context.Context, req *logical.Request, d *fr
 // pathRolesDelete makes a request to Vault storage to delete a role
 func (b *backend) pathRolesDelete(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	roleName := data.Get("name").(string)
-	role, err := b.getRole(ctx, req.Storage, roleName)
+	role, err := getRole(ctx, req.Storage, roleName)
 	if err != nil {
 		return logical.ErrorResponse(err.Error()), nil
 	}
@@ -107,7 +107,7 @@ func (b *backend) pathRolesDelete(ctx context.Context, req *logical.Request, dat
 	return nil, nil
 }
 
-func (b *backend) getRole(ctx context.Context, s logical.Storage, name string) (*model.Role, error) {
+func getRole(ctx context.Context, s logical.Storage, name string) (*model.Role, error) {
 	blog.Info(name)
 	if name == "" {
 		return nil, fmt.Errorf("missing role name")
