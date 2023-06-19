@@ -6,6 +6,7 @@ require (
 	github.com/hashicorp/go-hclog v1.5.0
 	github.com/hashicorp/vault/api v1.9.2
 	github.com/hashicorp/vault/sdk v0.9.1
+	github.com/sethvargo/go-password v0.2.0
 	golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1
 )
 

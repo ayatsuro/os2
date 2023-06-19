@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	pwdGen "github.com/sethvargo/go-password/password"
 	"io"
 	"net/http"
 	"os2/model"
@@ -18,6 +19,7 @@ const (
 	nsHeaderName = "x-emc-namespace"
 	GET          = "GET"
 	POST         = "POST"
+	PUT          = "PUT"
 )
 
 type ecsClient struct {
@@ -216,6 +218,25 @@ func (e *ecsClient) deleteAccessKey(namespace, username, accessKeyId string) err
 	return e.API(POST, path, namespace, nil, nil)
 }
 
+func (e *ecsClient) rotatePwd(username string) (string, error) {
+	gen, err := pwdGen.NewGenerator(&pwdGen.GeneratorInput{
+		Symbols: "!@#$%^&"})
+	if err != nil {
+		return "", err
+	}
+	pwd, err := gen.Generate(8, 1, 1, false, false)
+	if err != nil {
+		return "", err
+	}
+	user := model.VdcUser{
+		Password:        pwd,
+		IsSystemAdmin:   "true",
+		IsSystemMonitor: "false",
+		IsSecurityAdmin: "false",
+	}
+	path := "/vdc/users/" + username + ".json"
+	return pwd, e.API(PUT, path, "", user, nil)
+}
 func (e *ecsClient) login() error {
 	req, err := http.NewRequest(GET, e.url+"/login", nil)
 	if err != nil {

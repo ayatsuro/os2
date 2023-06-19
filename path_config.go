@@ -11,62 +11,98 @@ import (
 
 const configStoragePath = "config"
 
-func pathConfig(b *backend) *framework.Path {
-	return &framework.Path{
-		Pattern: "config",
-		Fields: map[string]*framework.FieldSchema{
-			"username": {
-				Type:        framework.TypeString,
-				Description: "username to access dell ecs api",
-				Required:    true,
-				DisplayAttrs: &framework.DisplayAttributes{
-					Name:      "username",
-					Sensitive: false,
+func pathConfig(b *backend) []*framework.Path {
+	return []*framework.Path{
+		{
+			Pattern: "config",
+			Fields: map[string]*framework.FieldSchema{
+				"username": {
+					Type:        framework.TypeString,
+					Description: "username to access dell ecs api",
+					Required:    true,
+					DisplayAttrs: &framework.DisplayAttributes{
+						Name:      "username",
+						Sensitive: false,
+					},
+				},
+				"password": {
+					Type:        framework.TypeString,
+					Description: "password to access dell ecs api",
+					Required:    true,
+					DisplayAttrs: &framework.DisplayAttributes{
+						Name:      "password",
+						Sensitive: true,
+					},
+				},
+				"url": {
+					Type:        framework.TypeString,
+					Description: "url to access dell ecs api",
+					Required:    true,
+					DisplayAttrs: &framework.DisplayAttributes{
+						Name:      "url",
+						Sensitive: false,
+					},
+				},
+				"skip_ssl": {
+					Type:        framework.TypeBool,
+					Description: "whether to skip or not ssl verify when accessing dell ecs api",
+					Required:    true,
+					DisplayAttrs: &framework.DisplayAttributes{
+						Name:      "skip_ssl",
+						Sensitive: false,
+					},
 				},
 			},
-			"password": {
-				Type:        framework.TypeString,
-				Description: "password to access dell ecs api",
-				Required:    true,
-				DisplayAttrs: &framework.DisplayAttributes{
-					Name:      "password",
-					Sensitive: true,
+			Operations: map[logical.Operation]framework.OperationHandler{
+				logical.ReadOperation: &framework.PathOperation{
+					Callback: b.pathConfigRead,
+				},
+				logical.CreateOperation: &framework.PathOperation{
+					Callback: b.pathConfigWrite,
+				},
+				logical.UpdateOperation: &framework.PathOperation{
+					Callback: b.pathConfigWrite,
 				},
 			},
-			"url": {
-				Type:        framework.TypeString,
-				Description: "url to access dell ecs api",
-				Required:    true,
-				DisplayAttrs: &framework.DisplayAttributes{
-					Name:      "url",
-					Sensitive: false,
-				},
-			},
-			"skip_ssl": {
-				Type:        framework.TypeBool,
-				Description: "whether to skip or not ssl verify when accessing dell ecs api",
-				Required:    true,
-				DisplayAttrs: &framework.DisplayAttributes{
-					Name:      "skip_ssl",
-					Sensitive: false,
-				},
-			},
+			ExistenceCheck:  b.pathExistenceCheck,
+			HelpSynopsis:    pathConfigHelpSynopsis,
+			HelpDescription: pathConfigHelpDescription,
 		},
-		Operations: map[logical.Operation]framework.OperationHandler{
-			logical.ReadOperation: &framework.PathOperation{
-				Callback: b.pathConfigRead,
+		{
+			Pattern: "config/rotate",
+			Fields:  map[string]*framework.FieldSchema{},
+			Operations: map[logical.Operation]framework.OperationHandler{
+				logical.CreateOperation: &framework.PathOperation{
+					Callback: b.pathConfigRotateWrite,
+				},
+				logical.UpdateOperation: &framework.PathOperation{
+					Callback: b.pathConfigRotateWrite,
+				},
 			},
-			logical.CreateOperation: &framework.PathOperation{
-				Callback: b.pathConfigWrite,
-			},
-			logical.UpdateOperation: &framework.PathOperation{
-				Callback: b.pathConfigWrite,
-			},
+			ExistenceCheck: b.pathExistenceCheck,
 		},
-		ExistenceCheck:  b.pathExistenceCheck,
-		HelpSynopsis:    pathConfigHelpSynopsis,
-		HelpDescription: pathConfigHelpDescription,
 	}
+}
+
+func (b *backend) pathConfigRotateWrite(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+	config, err := GetConfig(ctx, req.Storage)
+	if err != nil {
+		return logical.ErrorResponse(err.Error()), nil
+	}
+	client, err := b.getClient(ctx, req.Storage)
+	if err != nil {
+		return logical.ErrorResponse("getting API client", err), nil
+	}
+	pwd, err := client.rotatePwd(config.Username)
+	if err != nil {
+		return logical.ErrorResponse(" ECS API rotate", err), nil
+	}
+	config.Password = pwd
+	if err := b.persistConfig(ctx, *config, req.Storage); err != nil {
+		return logical.ErrorResponse("storing config", err), nil
+	}
+	return nil, nil
+
 }
 
 func (b *backend) pathConfigRead(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
@@ -97,16 +133,23 @@ func (b *backend) pathConfigWrite(ctx context.Context, req *logical.Request, dat
 		Url:      url.(string),
 		SkipSsl:  data.Get("skip_ssl").(bool),
 	}
+	if err := b.persistConfig(ctx, config, req.Storage); err != nil {
+		return logical.ErrorResponse("storing config", err), nil
+	}
+	return nil, nil
+}
+
+func (b *backend) persistConfig(ctx context.Context, config model.PluginConfig, storage logical.Storage) error {
 	entry, err := logical.StorageEntryJSON(configStoragePath, &config)
 	if err != nil {
-		return logical.ErrorResponse(err.Error()), nil
+		return err
 	}
-	if err := req.Storage.Put(ctx, entry); err != nil {
-		return nil, err
+	if err := storage.Put(ctx, entry); err != nil {
+		return err
 	}
 	// reset client so next invocation will pick up config changes
-	//b.reset()
-	return nil, nil
+	b.reset()
+	return nil
 }
 
 func (b *backend) pathExistenceCheck(ctx context.Context, req *logical.Request, data *framework.FieldData) (bool, error) {

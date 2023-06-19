@@ -20,6 +20,13 @@ type IamUser struct {
 	UserName string `json:"UserName"`
 }
 
+type VdcUser struct {
+	Password        string `json:"password"`
+	IsSystemAdmin   string `json:"isSystemAdmin"`
+	IsSystemMonitor string `json:"isSystemMonitor"`
+	IsSecurityAdmin string `json:"isSecurityAdmin"`
+}
+
 type AccessKey struct {
 	AccessKeyId     string `json:"AccessKeyId"`
 	UserName        string `json:"UserName"`
