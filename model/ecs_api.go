@@ -31,17 +31,7 @@ type AccessKey struct {
 	AccessKeyId     string `json:"AccessKeyId"`
 	UserName        string `json:"UserName"`
 	SecretAccessKey string `json:"SecretAccessKey,omitempty"`
-}
-
-func (k AccessKey) ToRoleEntry(ns string) *Role {
-	return &Role{
-		Username:        k.UserName,
-		AccessKeyId:     k.AccessKeyId,
-		SecretAccessKey: k.SecretAccessKey,
-		Namespace:       ns,
-		TTL:             0,
-		MaxTTL:          0,
-	}
+	CreateDate      string `json:"CreateDate"`
 }
 
 type CreateAccessKey struct {

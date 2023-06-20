@@ -24,6 +24,11 @@ func pathNamespace(b *backend) []*framework.Path {
 					Description: "Name of the user",
 					Required:    true,
 				},
+				"safe_id": {
+					Type:        framework.TypeLowerCaseString,
+					Description: "CSM v4 SafeId",
+					Required:    true,
+				},
 			},
 			Operations: map[logical.Operation]framework.OperationHandler{
 				logical.CreateOperation: &framework.PathOperation{
@@ -43,6 +48,11 @@ func pathNamespace(b *backend) []*framework.Path {
 				"namespace": {
 					Type:        framework.TypeLowerCaseString,
 					Description: "Name of the namespace",
+					Required:    true,
+				},
+				"safe_id": {
+					Type:        framework.TypeLowerCaseString,
+					Description: "CSM v4 SafeId",
 					Required:    true,
 				},
 			},
@@ -68,8 +78,9 @@ func pathNamespace(b *backend) []*framework.Path {
 
 func (b *backend) pathNamespaceMigrate(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	namespace, okName := data.GetOk("namespace")
-	if !okName {
-		return logical.ErrorResponse("field namespace required"), nil
+	safeId, okSafe := data.GetOk("safe_id")
+	if !okName || !okSafe {
+		return logical.ErrorResponse("fields namespace and safe_id are required"), nil
 	}
 	client, err := b.getClient(ctx, req.Storage)
 	if err != nil {
@@ -79,6 +90,9 @@ func (b *backend) pathNamespaceMigrate(ctx context.Context, req *logical.Request
 	if err != nil {
 		return logical.ErrorResponse(err.Error()), nil
 	}
+	for i, r := range roles {
+		roles[i].Name = safeId.(string) + "_" + r.Username
+	}
 	// store the roles
 	for _, role := range roles {
 		if err := setRole(ctx, req.Storage, role); err != nil {
@@ -87,8 +101,7 @@ func (b *backend) pathNamespaceMigrate(ctx context.Context, req *logical.Request
 	}
 	resp := &logical.Response{
 		Data: map[string]interface{}{
-			"namespace": namespace,
-			"users":     model.ToResponseData(roles),
+			"role_names": model.ToResponseData(roles),
 		}}
 	return resp, nil
 }
@@ -96,14 +109,16 @@ func (b *backend) pathNamespaceMigrate(ctx context.Context, req *logical.Request
 func (b *backend) pathNamespaceOnboard(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	namespace, okName := data.GetOk("namespace")
 	username, okUser := data.GetOk("username")
-	if !okName || !okUser {
-		return logical.ErrorResponse("both fields namespace and username are required"), nil
+	safeId, okSafe := data.GetOk("safe_id")
+	if !okName || !okUser || !okSafe {
+		return logical.ErrorResponse("fields namespace, username and safe_id are required"), nil
 	}
 	client, err := b.getClient(ctx, req.Storage)
 	if err != nil {
 		return logical.ErrorResponse(err.Error()), nil
 	}
 	role, err := client.onboardNamespace(namespace.(string), username.(string))
+	role.Name = safeId.(string) + "_" + role.Username
 	if err != nil {
 		return logical.ErrorResponse(err.Error()), nil
 	}
@@ -112,9 +127,7 @@ func (b *backend) pathNamespaceOnboard(ctx context.Context, req *logical.Request
 	}
 	resp := &logical.Response{
 		Data: map[string]interface{}{
-			"namespace":     namespace,
-			"username":      role.Username,
-			"access_key_id": role.AccessKeyId,
+			"role_name": role.Name,
 		}}
 	return resp, nil
 }

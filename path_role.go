@@ -100,7 +100,7 @@ func (b *backend) pathRolesDelete(ctx context.Context, req *logical.Request, dat
 		return logical.ErrorResponse(err.Error()), nil
 
 	}
-	if err := client.deleteAccessKey(role.Namespace, role.Username, role.AccessKeyId); err != nil {
+	if err := client.deleteAccessKey(role.Namespace, role.Username, role.AccessKey1.AccessKeyId); err != nil {
 		return logical.ErrorResponse(err.Error()), nil
 	}
 	return nil, nil
@@ -126,8 +126,8 @@ func getRole(ctx context.Context, s logical.Storage, name string) (*model.Role, 
 	}
 	return &role, nil
 }
-func setRole(ctx context.Context, s logical.Storage, roleEntry *model.Role) error {
-	entry, err := logical.StorageEntryJSON("role/"+roleEntry.RoleName(), roleEntry)
+func setRole(ctx context.Context, s logical.Storage, role *model.Role) error {
+	entry, err := logical.StorageEntryJSON("role/"+role.Name, role)
 	if err != nil {
 		return err
 	}

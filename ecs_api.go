@@ -51,8 +51,18 @@ func (e *ecsClient) onboardNamespace(namespace, username string) (*model.Role, e
 		return nil, errors.New("namespace " + namespace + " not found")
 	}
 	// 2. create the iam user and its access key
-	return e.createIamUserAndKey(namespace, username)
-
+	key, err := e.createIamUserAndKey(namespace, username)
+	if err != nil {
+		return nil, err
+	}
+	role := model.Role{
+		Username:   username,
+		AccessKey1: key,
+		Namespace:  namespace,
+		TTL:        0,
+		MaxTTL:     0,
+	}
+	return &role, nil
 }
 
 func (e *ecsClient) migrateNamespace(namespace string) ([]*model.Role, error) {
@@ -72,11 +82,17 @@ func (e *ecsClient) migrateNamespace(namespace string) ([]*model.Role, error) {
 	}
 	var roles []*model.Role
 	for _, user := range users {
-		role, err := e.createAccessKey(namespace, user.UserName)
+		key, err := e.createAccessKey(namespace, user.UserName)
 		if err != nil {
 			return nil, err
 		}
-		roles = append(roles, role)
+		roles = append(roles, &model.Role{
+			Username:   user.UserName,
+			AccessKey1: key,
+			Namespace:  namespace,
+			TTL:        0,
+			MaxTTL:     0,
+		})
 	}
 	// 3 list native users, and if not found in iam users, create an iam user and its access key
 	path := "/object/users/" + namespace + ".json"
@@ -131,7 +147,19 @@ func (e *ecsClient) onboardIamUser(namespace, username string, checkNsExists boo
 		return nil, errors.New("iam user already exists")
 	}
 	// create iam user
-	return e.createIamUserAndKey(namespace, username)
+	key, err := e.createIamUserAndKey(namespace, username)
+	if err != nil {
+		return nil, err
+	}
+	role := model.Role{
+		Username:   username,
+		AccessKey1: key,
+		Namespace:  namespace,
+		TTL:        0,
+		MaxTTL:     0,
+	}
+	return &role, nil
+
 }
 
 func (e *ecsClient) getIamUsers(namespace string) ([]model.IamUser, error) {
@@ -155,7 +183,7 @@ func (e *ecsClient) checkIamUserExists(namespace, username string) (bool, error)
 	return false, nil
 }
 
-func (e *ecsClient) createIamUserAndKey(namespace, username string) (*model.Role, error) {
+func (e *ecsClient) createIamUserAndKey(namespace, username string) (*model.AccessKey, error) {
 	path := "/iam?Action=CreateUser&UserName=" + username
 	if err := e.API(POST, path, namespace, nil, nil); err != nil {
 		return nil, err
@@ -167,14 +195,14 @@ func (e *ecsClient) createIamUserAndKey(namespace, username string) (*model.Role
 	return e.createAccessKey(namespace, username)
 }
 
-func (e *ecsClient) createAccessKey(namespace, username string) (*model.Role, error) {
-	var key model.CreateAccessKey
+func (e *ecsClient) createAccessKey(namespace, username string) (*model.AccessKey, error) {
+	var response model.CreateAccessKey
 	path := "/iam?Action=CreateAccessKey&UserName=" + username
-	if err := e.API(POST, path, namespace, nil, &key); err != nil {
+	if err := e.API(POST, path, namespace, nil, &response); err != nil {
 		return nil, err
 	}
-	role := key.CreateAccessKeyResult.AccessKey.ToRoleEntry(namespace)
-	return role, nil
+	key := response.CreateAccessKeyResult.AccessKey
+	return &key, nil
 }
 
 func (e *ecsClient) checkNsExists(name string) (bool, error) {
