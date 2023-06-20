@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"fmt"
 	pwdGen "github.com/sethvargo/go-password/password"
 	"io"
 	"net/http"
@@ -81,14 +80,6 @@ func (e *ecsClient) migrateNamespace(namespace string) ([]*model.Role, error) {
 	}
 	var roles []*model.Role
 	for _, user := range users {
-		var accessKeys model.ListAccessKeys
-		path := "/iam?Action=ListAccessKeys&UserName=" + user.UserName
-		if err := e.API(POST, path, namespace, nil, accessKeys); err != nil {
-			return nil, err
-		}
-		if len(accessKeys.ListAccessKeysResult.AccessKeyMetadata) > 1 {
-			return nil, fmt.Errorf("more than 1 access key for user %v", user.UserName)
-		}
 		role, err := e.createAccessKey(namespace, user.UserName)
 		if err != nil {
 			return nil, err
@@ -286,7 +277,7 @@ func (e *ecsClient) API(method, path, namespace string, data any, obj any) error
 	if err != nil {
 		return err
 	}
-	// if token has expired, we login again
+	// if token has expired, we log in again
 	if resp.StatusCode == 401 {
 		if err := e.login(); err != nil {
 			return err

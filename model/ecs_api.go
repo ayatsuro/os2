@@ -52,14 +52,6 @@ type CreateAccessKeyResult struct {
 	AccessKey AccessKey `json:"AccessKey"`
 }
 
-type ListAccessKeys struct {
-	ListAccessKeysResult ListAccessKeysResult `json:"ListAccessKeysResult"`
-}
-
-type ListAccessKeysResult struct {
-	AccessKeyMetadata []AccessKey `json:"AccessKeyMetadata"`
-}
-
 type NativeUsers struct {
 	Users []NativeUser `json:"blobuser"`
 }
