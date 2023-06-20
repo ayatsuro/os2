@@ -40,7 +40,10 @@ func (b *backend) pathCredsRead(ctx context.Context, req *logical.Request, d *fr
 	if role == nil {
 		return logical.ErrorResponse(err.Error()), nil
 	}
-	accessKeyId, secretAccessKey := role.NewestKey()
+	accessKeyId, secretAccessKey, err := role.NewestKey()
+	if err != nil {
+		return logical.ErrorResponse(err.Error()), nil
+	}
 	resp := b.Secret(secretAccessKeyType).Response(map[string]interface{}{
 		"secret_access_key": secretAccessKey,
 		"access_key_id":     accessKeyId,
