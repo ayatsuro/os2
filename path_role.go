@@ -70,7 +70,6 @@ func (b *backend) pathRolesList(ctx context.Context, req *logical.Request, d *fr
 }
 
 func (b *backend) pathRolesRead(ctx context.Context, req *logical.Request, d *framework.FieldData) (*logical.Response, error) {
-	blog.Info(d.Get("name").(string))
 	entry, err := getRole(ctx, req.Storage, d.Get("name").(string))
 	if err != nil {
 		return logical.ErrorResponse(err.Error()), nil
@@ -108,14 +107,11 @@ func (b *backend) pathRolesDelete(ctx context.Context, req *logical.Request, dat
 }
 
 func getRole(ctx context.Context, s logical.Storage, name string) (*model.Role, error) {
-	blog.Info(name)
 	if name == "" {
 		return nil, fmt.Errorf("missing role name")
 	}
 
 	entry, err := s.Get(ctx, "role/"+name)
-	blog.Info(entry.Key)
-	blog.Info(string(entry.Value))
 	if err != nil {
 		return nil, err
 	}

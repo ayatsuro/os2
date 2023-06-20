@@ -13,7 +13,6 @@ import (
 
 var blog hclog.Logger
 
-// backend wraps the backend framework and adds a map for storing key value pairs
 type backend struct {
 	*framework.Backend
 	lock   sync.RWMutex
@@ -47,6 +46,7 @@ func newBackend() *backend {
 			pathConfig(b),
 			[]*framework.Path{pathCreds(b), pathIamUser(b)}),
 		Invalidate: b.invalidate,
+
 		PathsSpecial: &logical.Paths{
 			LocalStorage: []string{},
 			SealWrapStorage: []string{

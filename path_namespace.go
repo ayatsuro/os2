@@ -12,7 +12,7 @@ import (
 func pathNamespace(b *backend) []*framework.Path {
 	return []*framework.Path{
 		{
-			Pattern: "namespace/onboard" + framework.GenericNameRegex("namespace"),
+			Pattern: "namespace/onboard", //+ framework.GenericNameRegex("namespace"),
 			Fields: map[string]*framework.FieldSchema{
 				"namespace": {
 					Type:        framework.TypeLowerCaseString,
@@ -38,7 +38,7 @@ func pathNamespace(b *backend) []*framework.Path {
 			},
 		},
 		{
-			Pattern: "namespace/migrate" + framework.GenericNameRegex("namespace"),
+			Pattern: "namespace/migrate",
 			Fields: map[string]*framework.FieldSchema{
 				"namespace": {
 					Type:        framework.TypeLowerCaseString,

@@ -60,7 +60,7 @@ func (e *ecsClient) onboardNamespace(namespace, username string) (*model.Role, e
 		return nil, errors.New("iam user " + username + " already exists")
 	}
 	// 3. create the access key
-	return e.createAccessKey(namespace, username)
+	return e.createIamUserAndKey(namespace, username)
 
 }
 
