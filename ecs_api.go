@@ -50,15 +50,7 @@ func (e *ecsClient) onboardNamespace(namespace, username string) (*model.Role, e
 	if !found {
 		return nil, errors.New("namespace " + namespace + " not found")
 	}
-	// 2. check the IAM user does not exist
-	found, err = e.checkIamUserExists(namespace, username)
-	if err != nil {
-		return nil, err
-	}
-	if found {
-		return nil, errors.New("iam user " + username + " already exists")
-	}
-	// 3. create the access key
+	// 2. create the iam user and its access key
 	return e.createIamUserAndKey(namespace, username)
 
 }
@@ -163,13 +155,13 @@ func (e *ecsClient) checkIamUserExists(namespace, username string) (bool, error)
 	return false, nil
 }
 
-func (e *ecsClient) createIamUser(namespace, username string) error {
-	path := "/iam?Action=CreateUser&UserName=" + username
-	return e.API(POST, path, namespace, nil, nil)
-}
-
 func (e *ecsClient) createIamUserAndKey(namespace, username string) (*model.Role, error) {
-	if err := e.createIamUser(namespace, username); err != nil {
+	path := "/iam?Action=CreateUser&UserName=" + username
+	if err := e.API(POST, path, namespace, nil, nil); err != nil {
+		return nil, err
+	}
+	path = "/iam?Action=AttachUserPolicy&PolicyArn=urn:ecs:iam:::policy/ECSS3FullAccess&UserName=" + username
+	if err := e.API(POST, path, namespace, nil, nil); err != nil {
 		return nil, err
 	}
 	return e.createAccessKey(namespace, username)
