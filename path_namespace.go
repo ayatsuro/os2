@@ -87,8 +87,8 @@ func (b *backend) pathNamespaceMigrate(ctx context.Context, req *logical.Request
 	}
 	resp := &logical.Response{
 		Data: map[string]interface{}{
-			"message": "namespace migrated",
-			"users":   model.ToResponseData(roles),
+			"namespace": namespace,
+			"users":     model.ToResponseData(roles),
 		}}
 	return resp, nil
 }
@@ -112,7 +112,7 @@ func (b *backend) pathNamespaceOnboard(ctx context.Context, req *logical.Request
 	}
 	resp := &logical.Response{
 		Data: map[string]interface{}{
-			"message":       "namespace onboarded",
+			"namespace":     namespace,
 			"username":      role.Username,
 			"access_key_id": role.AccessKeyId,
 		}}
