@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	pwdGen "github.com/sethvargo/go-password/password"
 	"io"
 	"net/http"
@@ -82,6 +83,16 @@ func (e *ecsClient) migrateNamespace(namespace string) ([]*model.Role, error) {
 		return nil, err
 	}
 	var roles []*model.Role
+	// we check all iam users have at most 1 key before creating anything
+	for _, user := range users {
+		keys, err := e.listAccessKeys(namespace, user.UserName)
+		if err != nil {
+			return nil, err
+		}
+		if len(keys) == 2 {
+			return nil, fmt.Errorf("IAM user %v can't be migrated, has already 2 access keys", user.UserName)
+		}
+	}
 	for _, user := range users {
 		key, err := e.createAccessKey(namespace, user.UserName)
 		if err != nil {
@@ -203,6 +214,16 @@ func (e *ecsClient) createAccessKey(namespace, username string) (*model.AccessKe
 	}
 	key := response.CreateAccessKeyResult.AccessKey
 	return &key, nil
+}
+
+func (e *ecsClient) listAccessKeys(namespace, username string) ([]model.AccessKey, error) {
+	var response model.ListAccessKeys
+	path := "/iam?Action=ListAccessKeys&UserName=" + username
+	if err := e.API(POST, path, namespace, nil, &response); err != nil {
+		return nil, err
+	}
+	keys := response.ListAccessKeysResult.AccessKeys
+	return keys, nil
 }
 
 func (e *ecsClient) checkNsExists(name string) (bool, error) {

@@ -50,3 +50,11 @@ type NativeUser struct {
 	Userid string `json:"userid,omitempty"`
 	Name   string `json:"name,omitempty"`
 }
+
+type ListAccessKeys struct {
+	ListAccessKeysResult AccessKeyMetadata `json:"ListAccessKeysResult"`
+}
+
+type AccessKeyMetadata struct {
+	AccessKeys []AccessKey `json:"AccessKeyMetadata"`
+}
