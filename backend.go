@@ -44,7 +44,7 @@ func newBackend() *backend {
 			pathNamespace(b),
 			pathRole(b),
 			pathConfig(b),
-			[]*framework.Path{pathCreds(b), pathIamUser(b)}),
+			[]*framework.Path{pathCreds(b)}),
 		Invalidate: b.invalidate,
 
 		PathsSpecial: &logical.Paths{

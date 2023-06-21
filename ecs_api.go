@@ -45,7 +45,6 @@ func newClient(config *model.PluginConfig) (*ecsClient, error) {
 func (e *ecsClient) onboardNamespace(namespace, username string) (*model.Role, error) {
 	// 1. check the namespace exists
 	found, err := e.checkNsExists(namespace)
-
 	if err != nil {
 		return nil, err
 	}
@@ -181,17 +180,18 @@ func (e *ecsClient) getIamUsers(namespace string) ([]model.IamUser, error) {
 	}
 	return allUsers.ListUsersResult.Users, nil
 }
+
 func (e *ecsClient) checkIamUserExists(namespace, username string) (bool, error) {
-	users, err := e.getIamUsers(namespace)
-	if err != nil {
+	path := "/iam?Action=GetUser&UserName=" + username
+	if err := e.API(GET, path, namespace, nil, nil); err != nil {
+		if apiErr, ok := err.(*ApiError); ok {
+			if apiErr.Code == 404 {
+				return false, nil
+			}
+		}
 		return false, err
 	}
-	for _, user := range users {
-		if strings.ToLower(user.UserName) == username {
-			return true, nil
-		}
-	}
-	return false, nil
+	return true, nil
 }
 
 func (e *ecsClient) createIamUserAndKey(namespace, username string) (*model.AccessKey, error) {
@@ -227,27 +227,42 @@ func (e *ecsClient) listAccessKeys(namespace, username string) ([]model.AccessKe
 }
 
 func (e *ecsClient) checkNsExists(name string) (bool, error) {
-	var allNs model.Namespaces
-	path := "/object/namespaces.json"
-	if err := e.API(GET, path, "", nil, &allNs); err != nil {
+	path := fmt.Sprintf("/object/namespaces/namespace/%s.json", name)
+	if err := e.API(GET, path, "", nil, nil); err != nil {
+		if apiErr, ok := err.(*ApiError); ok {
+			if apiErr.Code == 404 {
+				return false, nil
+			}
+		}
 		return false, err
 	}
-	for _, ns := range allNs.Namespace {
-		if strings.ToLower(ns.Name) == name {
-			return true, nil
-		}
-	}
-	return false, nil
+	return true, nil
 }
 
-func (e *ecsClient) deleteNamespace(name string) error {
-	path := "/object/namespaces/namespace/" + name + "/deactivate.json"
-	return e.API(POST, path, "", nil, nil)
+func (e *ecsClient) deleteIamUser(namespace, username string) error {
+	path := "/iam?Action=DeleteUser&UserName=" + username
+	if err := e.API(POST, path, namespace, nil, nil); err != nil {
+		if apiErr, ok := err.(*ApiError); ok {
+			if apiErr.Code == 404 {
+				return nil
+			}
+		}
+		return err
+	}
+	return nil
 }
 
 func (e *ecsClient) deleteAccessKey(namespace, username, accessKeyId string) error {
 	path := "/iam?Action=DeleteAccessKey&UserName=" + username + "&AccessKeyId=" + accessKeyId
-	return e.API(POST, path, namespace, nil, nil)
+	if err := e.API(POST, path, namespace, nil, nil); err != nil {
+		if apiErr, ok := err.(*ApiError); ok {
+			if apiErr.Code == 404 {
+				return nil
+			}
+		}
+		return err
+	}
+	return nil
 }
 
 func (e *ecsClient) rotatePwd(username string) (string, error) {
@@ -333,7 +348,7 @@ func (e *ecsClient) API(method, path, namespace string, data any, obj any) error
 	defer resp.Body.Close()
 	bodyByte, err := io.ReadAll(resp.Body)
 	if resp.StatusCode > 300 {
-		return errors.New(strconv.Itoa(resp.StatusCode) + " " + string(bodyByte))
+		return newApiError(resp.StatusCode, string(bodyByte))
 	}
 
 	if len(bodyByte) > 0 && obj != nil {
@@ -342,4 +357,20 @@ func (e *ecsClient) API(method, path, namespace string, data any, obj any) error
 		}
 	}
 	return nil
+}
+
+type ApiError struct {
+	Code int
+	Msg  string
+}
+
+func (e *ApiError) Error() string {
+	return fmt.Sprintf("%d %s", e.Code, e.Msg)
+}
+
+func newApiError(code int, msg string) *ApiError {
+	return &ApiError{
+		Code: code,
+		Msg:  msg,
+	}
 }

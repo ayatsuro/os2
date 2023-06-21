@@ -37,9 +37,6 @@ func pathNamespace(b *backend) []*framework.Path {
 				logical.UpdateOperation: &framework.PathOperation{
 					Callback: b.pathNamespaceOnboard,
 				},
-				logical.DeleteOperation: &framework.PathOperation{
-					Callback: b.pathNamespaceDelete,
-				},
 			},
 		},
 		{
@@ -145,32 +142,6 @@ func (b *backend) pathNamespacesList(ctx context.Context, req *logical.Request, 
 		}
 	}
 	return logical.ListResponse(dedup), nil
-}
-
-func (b *backend) pathNamespaceDelete(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-	ns := data.Get("namespace").(string)
-	// 1. delete all roles
-	roles, err := req.Storage.List(ctx, "role/")
-	if err != nil {
-		return logical.ErrorResponse(err.Error()), nil
-	}
-	for _, role := range roles {
-		if strings.HasPrefix(role, ns+"_") {
-			err = req.Storage.Delete(ctx, "role/"+role)
-			if err != nil {
-				return logical.ErrorResponse(err.Error()), nil
-			}
-		}
-	}
-	// 2. delete ns in ECS
-	client, err := b.getClient(ctx, req.Storage)
-	if err != nil {
-		return logical.ErrorResponse(err.Error()), nil
-	}
-	if err := client.deleteNamespace(ns); err != nil {
-		return logical.ErrorResponse(err.Error()), nil
-	}
-	return nil, nil
 }
 
 func (b *backend) pathNamespaceUpdate(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {

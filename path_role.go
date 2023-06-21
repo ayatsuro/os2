@@ -22,10 +22,6 @@ func pathRole(b *backend) []*framework.Path {
 					Type:     framework.TypeLowerCaseString,
 					Required: true,
 				},
-				"access_key_id": {
-					Type:     framework.TypeString,
-					Required: true,
-				},
 				"username": {
 					Type:     framework.TypeLowerCaseString,
 					Required: true,
@@ -100,7 +96,7 @@ func (b *backend) pathRolesDelete(ctx context.Context, req *logical.Request, dat
 		return logical.ErrorResponse(err.Error()), nil
 
 	}
-	if err := client.deleteAccessKey(role.Namespace, role.Username, role.AccessKey1.AccessKeyId); err != nil {
+	if err := client.deleteIamUser(role.Namespace, role.Username); err != nil {
 		return logical.ErrorResponse(err.Error()), nil
 	}
 	return nil, nil
