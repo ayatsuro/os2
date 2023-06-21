@@ -44,6 +44,7 @@ func newClient(config *model.PluginConfig) (*ecsClient, error) {
 func (e *ecsClient) onboardNamespace(namespace, username string) (*model.Role, error) {
 	// 1. check the namespace exists
 	found, err := e.checkNsExists(namespace)
+
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +113,6 @@ func (e *ecsClient) migrateNamespace(namespace string) ([]*model.Role, error) {
 		for _, role := range roles {
 			if role.Username == user.Name {
 				found = true
-				break
 			}
 		}
 		if !found {

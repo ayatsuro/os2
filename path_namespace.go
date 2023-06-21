@@ -118,10 +118,10 @@ func (b *backend) pathNamespaceOnboard(ctx context.Context, req *logical.Request
 		return logical.ErrorResponse(err.Error()), nil
 	}
 	role, err := client.onboardNamespace(namespace.(string), username.(string))
-	role.Name = safeId.(string) + "_" + role.Username
 	if err != nil {
 		return logical.ErrorResponse(err.Error()), nil
 	}
+	role.Name = safeId.(string) + "_" + role.Username
 	if err := setRole(ctx, req.Storage, role); err != nil {
 		return logical.ErrorResponse(err.Error()), nil
 	}

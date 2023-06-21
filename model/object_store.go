@@ -49,7 +49,7 @@ func (r *Role) NewestKey() (string, string, error) {
 }
 
 func ToResponseData(roles []*Role) []string {
-	output := make([]string, len(roles))
+	var output []string
 	for _, role := range roles {
 		output = append(output, role.Name)
 	}

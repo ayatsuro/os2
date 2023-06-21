@@ -138,6 +138,5 @@ func setRole(ctx context.Context, s logical.Storage, role *model.Role) error {
 	if err := s.Put(ctx, entry); err != nil {
 		return err
 	}
-
 	return nil
 }
