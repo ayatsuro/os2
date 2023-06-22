@@ -49,7 +49,7 @@ func (e *ecsClient) onboardNamespace(namespace, username string) (*model.Role, e
 		return nil, err
 	}
 	if !found {
-		return nil, errors.New("namespace " + namespace + " not found")
+		return nil, fmt.Errorf("namespace %s not found", namespace)
 	}
 	// 2. create the iam user and its access key
 	key, err := e.createIamUserAndKey(namespace, username)
@@ -73,7 +73,7 @@ func (e *ecsClient) migrateNamespace(namespace string) ([]*model.Role, error) {
 		return nil, err
 	}
 	if !found {
-		return nil, errors.New("namespace " + namespace + " not found")
+		return nil, fmt.Errorf("namespace %s not found", namespace)
 	}
 	// 2. list iam users, and for each of them check there is only 1 access key
 	//    if only one access key, create a new access key
@@ -89,7 +89,7 @@ func (e *ecsClient) migrateNamespace(namespace string) ([]*model.Role, error) {
 			return nil, err
 		}
 		if len(keys) == 2 {
-			return nil, fmt.Errorf("IAM user %v can't be migrated, has already 2 access keys", user.UserName)
+			return nil, fmt.Errorf("user %v can't be migrated, it has already 2 access keys", user.UserName)
 		}
 	}
 	for _, user := range users {
@@ -126,7 +126,7 @@ func (e *ecsClient) migrateNamespace(namespace string) ([]*model.Role, error) {
 			}
 		}
 		if !found {
-			role, err := e.onboardIamUser(namespace, user.Name, false)
+			role, err := e.createIamUser(namespace, user.Name, false)
 			if err != nil {
 				return nil, err
 			}
@@ -137,7 +137,7 @@ func (e *ecsClient) migrateNamespace(namespace string) ([]*model.Role, error) {
 	return roles, nil
 }
 
-func (e *ecsClient) onboardIamUser(namespace, username string, checkNsExists bool) (*model.Role, error) {
+func (e *ecsClient) createIamUser(namespace, username string, checkNsExists bool) (*model.Role, error) {
 	// check the ns exists
 	if checkNsExists {
 		found, err := e.checkNsExists(namespace)
@@ -145,7 +145,7 @@ func (e *ecsClient) onboardIamUser(namespace, username string, checkNsExists boo
 			return nil, err
 		}
 		if !found {
-			return nil, errors.New("namespace not found")
+			return nil, fmt.Errorf("namespace %s not found", namespace)
 		}
 	}
 	// check username not already exists
@@ -154,7 +154,7 @@ func (e *ecsClient) onboardIamUser(namespace, username string, checkNsExists boo
 		return nil, err
 	}
 	if found {
-		return nil, errors.New("iam user already exists")
+		return nil, fmt.Errorf("iam user %s already exists in namespace %s", username, namespace)
 	}
 	// create iam user
 	key, err := e.createIamUserAndKey(namespace, username)

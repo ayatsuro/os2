@@ -6,6 +6,7 @@ import (
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/logical"
 	"os2/model"
+	"strings"
 )
 
 func pathRole(b *backend) []*framework.Path {
@@ -14,11 +15,15 @@ func pathRole(b *backend) []*framework.Path {
 			Pattern: "role/" + framework.GenericNameRegex("name"),
 			Fields: map[string]*framework.FieldSchema{
 				"name": {
-					Type:        framework.TypeString,
+					Type:        framework.TypeLowerCaseString,
 					Description: "Name of the role",
 					Required:    true,
 				},
 				"namespace": {
+					Type:     framework.TypeLowerCaseString,
+					Required: true,
+				},
+				"safe_id": {
 					Type:     framework.TypeLowerCaseString,
 					Required: true,
 				},
@@ -37,10 +42,16 @@ func pathRole(b *backend) []*framework.Path {
 			},
 			Operations: map[logical.Operation]framework.OperationHandler{
 				logical.ReadOperation: &framework.PathOperation{
-					Callback: b.pathRolesRead,
+					Callback: b.pathRoleRead,
+				},
+				logical.CreateOperation: &framework.PathOperation{
+					Callback: b.pathRoleWrite,
+				},
+				logical.UpdateOperation: &framework.PathOperation{
+					Callback: b.pathRoleWrite,
 				},
 				logical.DeleteOperation: &framework.PathOperation{
-					Callback: b.pathRolesDelete,
+					Callback: b.pathRoleDelete,
 				},
 			},
 			ExistenceCheck: b.pathExistenceCheck,
@@ -65,7 +76,36 @@ func (b *backend) pathRolesList(ctx context.Context, req *logical.Request, d *fr
 	return logical.ListResponse(roles), nil
 }
 
-func (b *backend) pathRolesRead(ctx context.Context, req *logical.Request, d *framework.FieldData) (*logical.Response, error) {
+func (b *backend) pathRoleWrite(ctx context.Context, req *logical.Request, d *framework.FieldData) (*logical.Response, error) {
+	roleName := d.Get("name").(string)
+	namespace, okNs := d.GetOk("namespace")
+	if !okNs {
+		return logical.ErrorResponse("namespace is required"), nil
+	}
+	_, username, _ := strings.Cut(roleName, "_")
+	client, err := b.getClient(ctx, req.Storage)
+	if err != nil {
+		return logical.ErrorResponse(err.Error()), nil
+
+	}
+	role, err := client.createIamUser(namespace.(string), username, true)
+	role.Name = roleName
+	if err != nil {
+		return logical.ErrorResponse(err.Error()), nil
+
+	}
+	debug(role)
+	if err := setRole(ctx, req.Storage, role); err != nil {
+		return logical.ErrorResponse(err.Error()), nil
+	}
+	resp := &logical.Response{
+		Data: map[string]interface{}{
+			"role_name": roleName,
+		}}
+	return resp, nil
+}
+
+func (b *backend) pathRoleRead(ctx context.Context, req *logical.Request, d *framework.FieldData) (*logical.Response, error) {
 	entry, err := getRole(ctx, req.Storage, d.Get("name").(string))
 	if err != nil {
 		return logical.ErrorResponse(err.Error()), nil
@@ -80,8 +120,8 @@ func (b *backend) pathRolesRead(ctx context.Context, req *logical.Request, d *fr
 	}, nil
 }
 
-// pathRolesDelete makes a request to Vault storage to delete a role
-func (b *backend) pathRolesDelete(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+// pathRoleDelete makes a request to Vault storage to delete a role
+func (b *backend) pathRoleDelete(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	roleName := data.Get("name").(string)
 	role, err := getRole(ctx, req.Storage, roleName)
 	if err != nil {
