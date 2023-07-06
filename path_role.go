@@ -156,11 +156,9 @@ func getRole(ctx context.Context, s logical.Storage, name string) (*model.Role, 
 	if err != nil {
 		return nil, err
 	}
-
 	if entry == nil {
 		return nil, nil
 	}
-
 	var role model.Role
 	if err := entry.DecodeJSON(&role); err != nil {
 		return nil, err
@@ -172,7 +170,6 @@ func setRole(ctx context.Context, s logical.Storage, role *model.Role) error {
 	if err != nil {
 		return err
 	}
-
 	if entry == nil {
 		return fmt.Errorf("failed to create storage entry for role")
 	}

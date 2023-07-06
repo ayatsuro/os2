@@ -44,7 +44,8 @@ func newBackend() *backend {
 			pathRole(b),
 			pathConfig(b),
 			[]*framework.Path{pathCreds(b)},
-			[]*framework.Path{pathRotateRole(b)}),
+			[]*framework.Path{pathRotateRole(b)},
+		),
 		Invalidate: b.invalidate,
 
 		PathsSpecial: &logical.Paths{

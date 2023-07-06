@@ -30,7 +30,6 @@ func pathRotateRole(b *backend) *framework.Path {
 
 func (b *backend) pathRotateRoleRead(ctx context.Context, req *logical.Request, d *framework.FieldData) (*logical.Response, error) {
 	roleName := d.Get("name").(string)
-
 	role, err := getRole(ctx, req.Storage, roleName)
 	if err != nil {
 		return logical.ErrorResponse(err.Error()), nil
@@ -39,6 +38,7 @@ func (b *backend) pathRotateRoleRead(ctx context.Context, req *logical.Request, 
 	if role == nil {
 		return nil, fmt.Errorf("role not found")
 	}
+	role.Name = roleName
 	oldestKeyId, err := role.OldestKeyId()
 	if err != nil {
 		return logical.ErrorResponse(err.Error()), nil

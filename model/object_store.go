@@ -1,6 +1,8 @@
 package model
 
-import "time"
+import (
+	"time"
+)
 
 type Role struct {
 	Name       string        `json:"-"`
@@ -66,7 +68,7 @@ func (r *Role) OldestKeyId() (string, error) {
 }
 
 func (r *Role) SetAccessKey(oldestKeyId string, key *AccessKey) {
-	if len(r.AccessKeys) < 2 {
+	if oldestKeyId == "" {
 		r.AccessKeys = append(r.AccessKeys, key)
 	} else {
 		if r.AccessKeys[0].AccessKeyId == oldestKeyId {
