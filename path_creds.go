@@ -2,6 +2,7 @@ package os2
 
 import (
 	"context"
+	"fmt"
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/logical"
 )
@@ -38,19 +39,19 @@ func (b *backend) pathCredsRead(ctx context.Context, req *logical.Request, d *fr
 	}
 
 	if role == nil {
-		return logical.ErrorResponse(err.Error()), nil
+		return nil, fmt.Errorf("role not found")
 	}
-	accessKeyId, secretAccessKey, err := role.NewestKey()
+	accessKey, err := role.NewestKey()
 	if err != nil {
 		return logical.ErrorResponse(err.Error()), nil
 	}
 	resp := b.Secret(secretAccessKeyType).Response(map[string]interface{}{
-		"secret_access_key": secretAccessKey,
-		"access_key_id":     accessKeyId,
+		"secret_access_key": accessKey.SecretAccessKey,
+		"access_key_id":     accessKey.AccessKeyId,
 		"namespace":         role.Namespace,
 		"username":          role.Username,
 	}, map[string]interface{}{
-		"secret_access_key": secretAccessKey,
+		"secret_access_key": accessKey.SecretAccessKey,
 	})
 
 	if role.TTL > 0 {

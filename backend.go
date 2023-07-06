@@ -41,10 +41,10 @@ func newBackend() *backend {
 	b.Backend = &framework.Backend{
 		BackendType: logical.TypeLogical,
 		Paths: framework.PathAppend(
-			pathNamespace(b),
 			pathRole(b),
 			pathConfig(b),
-			[]*framework.Path{pathCreds(b)}),
+			[]*framework.Path{pathCreds(b)},
+			[]*framework.Path{pathRotateRole(b)}),
 		Invalidate: b.invalidate,
 
 		PathsSpecial: &logical.Paths{

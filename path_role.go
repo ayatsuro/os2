@@ -47,9 +47,6 @@ func pathRole(b *backend) []*framework.Path {
 				logical.CreateOperation: &framework.PathOperation{
 					Callback: b.pathRoleWrite,
 				},
-				logical.UpdateOperation: &framework.PathOperation{
-					Callback: b.pathRoleWrite,
-				},
 				logical.DeleteOperation: &framework.PathOperation{
 					Callback: b.pathRoleDelete,
 				},
@@ -82,18 +79,26 @@ func (b *backend) pathRoleWrite(ctx context.Context, req *logical.Request, d *fr
 	if !okNs {
 		return logical.ErrorResponse("namespace is required"), nil
 	}
+	entry, err := getRole(ctx, req.Storage, d.Get("name").(string))
+	if err != nil {
+		return logical.ErrorResponse(err.Error()), nil
+	}
+	if entry != nil {
+		return logical.ErrorResponse("role already exists"), nil
+	}
 	_, username, _ := strings.Cut(roleName, "_")
 	client, err := b.getClient(ctx, req.Storage)
 	if err != nil {
 		return logical.ErrorResponse(err.Error()), nil
 
 	}
-	role, err := client.createIamUser(namespace.(string), username, true)
-	role.Name = roleName
+
+	role, err := client.createIamUser(namespace.(string), username)
 	if err != nil {
 		return logical.ErrorResponse(err.Error()), nil
 
 	}
+	role.Name = roleName
 	debug(role)
 	if err := setRole(ctx, req.Storage, role); err != nil {
 		return logical.ErrorResponse(err.Error()), nil
@@ -112,7 +117,7 @@ func (b *backend) pathRoleRead(ctx context.Context, req *logical.Request, d *fra
 	}
 
 	if entry == nil {
-		return logical.ErrorResponse(err.Error()), nil
+		return logical.ErrorResponse("role not found"), nil
 	}
 
 	return &logical.Response{

@@ -42,128 +42,42 @@ func newClient(config *model.PluginConfig) (*ecsClient, error) {
 	return client, nil
 }
 
-func (e *ecsClient) onboardNamespace(namespace, username string) (*model.Role, error) {
-	// 1. check the namespace exists
-	found, err := e.checkNsExists(namespace)
-	if err != nil {
-		return nil, err
-	}
-	if !found {
-		return nil, fmt.Errorf("namespace %s not found", namespace)
-	}
-	// 2. create the iam user and its access key
-	key, err := e.createIamUserAndKey(namespace, username)
-	if err != nil {
-		return nil, err
-	}
-	role := model.Role{
-		Username:   username,
-		AccessKey1: key,
-		Namespace:  namespace,
-		TTL:        0,
-		MaxTTL:     0,
-	}
-	return &role, nil
-}
-
-func (e *ecsClient) migrateNamespace(namespace string) ([]*model.Role, error) {
-	// 1. check the namespace exists
-	found, err := e.checkNsExists(namespace)
-	if err != nil {
-		return nil, err
-	}
-	if !found {
-		return nil, fmt.Errorf("namespace %s not found", namespace)
-	}
-	// 2. list iam users, and for each of them check there is only 1 access key
-	//    if only one access key, create a new access key
-	users, err := e.getIamUsers(namespace)
-	if err != nil {
-		return nil, err
-	}
-	var roles []*model.Role
-	// we check all iam users have at most 1 key before creating anything
-	for _, user := range users {
-		keys, err := e.listAccessKeys(namespace, user.UserName)
-		if err != nil {
-			return nil, err
-		}
-		if len(keys) == 2 {
-			return nil, fmt.Errorf("user %v can't be migrated, it has already 2 access keys", user.UserName)
-		}
-	}
-	for _, user := range users {
-		key, err := e.createAccessKey(namespace, user.UserName)
-		if err != nil {
-			return nil, err
-		}
-		roles = append(roles, &model.Role{
-			Username:   user.UserName,
-			AccessKey1: key,
-			Namespace:  namespace,
-			TTL:        0,
-			MaxTTL:     0,
-		})
-	}
-	// 3 list native users, and if not found in iam users, create an iam user and its access key
-	path := "/object/users/" + namespace + ".json"
-	var nativeUsers model.NativeUsers
-	if err := e.API(GET, path, "", nil, &nativeUsers); err != nil {
-		return nil, err
-	}
-	nUsers := nativeUsers.Users
-	for _, user := range nUsers {
-		path := "/object/users/" + user.Userid + "/info.json"
-		// we complete the native user with the name
-		// since we don't need it outside of the loop, we're fine to only update the local variable user
-		if err := e.API(GET, path, "", nil, &user); err != nil {
-			return nil, err
-		}
-		found := false
-		for _, role := range roles {
-			if role.Username == user.Name {
-				found = true
-			}
-		}
-		if !found {
-			role, err := e.createIamUser(namespace, user.Name, false)
-			if err != nil {
-				return nil, err
-			}
-			roles = append(roles, role)
-		}
-
-	}
-	return roles, nil
-}
-
-func (e *ecsClient) createIamUser(namespace, username string, checkNsExists bool) (*model.Role, error) {
+func (e *ecsClient) createIamUser(namespace, username string) (*model.Role, error) {
 	// check the ns exists
-	if checkNsExists {
-		found, err := e.checkNsExists(namespace)
-		if err != nil {
-			return nil, err
-		}
-		if !found {
-			return nil, fmt.Errorf("namespace %s not found", namespace)
-		}
+	found, err := e.checkNsExists(namespace)
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, fmt.Errorf("namespace %s not found", namespace)
 	}
 	// check username not already exists
-	found, err := e.checkIamUserExists(namespace, username)
+	found, err = e.checkIamUserExists(namespace, username)
 	if err != nil {
 		return nil, err
 	}
-	if found {
-		return nil, fmt.Errorf("iam user %s already exists in namespace %s", username, namespace)
+	var key *model.AccessKey
+	if !found {
+		// create iam user
+		key, err = e.createIamUserAndKey(namespace, username)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		keys, err := e.listAccessKeys(namespace, username)
+		if err != nil {
+			return nil, err
+		}
+		if len(keys) > 1 {
+			return nil, fmt.Errorf("user %v has already 2 access keys", username)
+		}
+		// create first or second key
+		key, err = e.createAccessKey(namespace, username)
 	}
-	// create iam user
-	key, err := e.createIamUserAndKey(namespace, username)
-	if err != nil {
-		return nil, err
-	}
+
 	role := model.Role{
 		Username:   username,
-		AccessKey1: key,
+		AccessKeys: []*model.AccessKey{key},
 		Namespace:  namespace,
 		TTL:        0,
 		MaxTTL:     0,

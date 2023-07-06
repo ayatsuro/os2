@@ -5,8 +5,7 @@ import "time"
 type Role struct {
 	Name       string        `json:"-"`
 	Username   string        `json:"username"`
-	AccessKey1 *AccessKey    `json:"access_key_1"`
-	AccessKey2 *AccessKey    `json:"access_key_2"`
+	AccessKeys []*AccessKey  `json:"access_keys"`
 	Namespace  string        `json:"namespace"`
 	TTL        time.Duration `json:"ttl"`
 	MaxTTL     time.Duration `json:"max_ttl"`
@@ -17,41 +16,63 @@ func (r *Role) ToResponseData() map[string]interface{} {
 		"ttl":             r.TTL.Seconds(),
 		"max_ttl":         r.MaxTTL.Seconds(),
 		"username":        r.Username,
-		"access_key_id_1": r.AccessKey1.AccessKeyId,
-		"create_date_1":   r.AccessKey1.CreateDate,
+		"access_key_id_1": r.AccessKeys[0].AccessKeyId,
+		"create_date_1":   r.AccessKeys[0].CreateDate,
 		"access_key_id_2": "n/a",
 		"create_date_2":   "n/a",
 		"namespace":       r.Namespace,
 	}
-	if r.AccessKey2 != nil {
-		respData["access_key_id_2"] = r.AccessKey2.AccessKeyId
-		respData["create_date_2"] = r.AccessKey2.CreateDate
+	if len(r.AccessKeys) == 2 {
+		respData["access_key_id_2"] = r.AccessKeys[1].AccessKeyId
+		respData["create_date_2"] = r.AccessKeys[1].CreateDate
 	}
 	return respData
 }
 
-func (r *Role) NewestKey() (string, string, error) {
-	if r.AccessKey2 == nil {
-		return r.AccessKey1.AccessKeyId, r.AccessKey1.SecretAccessKey, nil
+func (r *Role) NewestKey() (*AccessKey, error) {
+	if len(r.AccessKeys) == 1 {
+		return r.AccessKeys[0], nil
 	}
-	d1, err := time.Parse(time.RFC3339, r.AccessKey1.CreateDate)
+	d1, err := time.Parse(time.RFC3339, r.AccessKeys[0].CreateDate)
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
-	d2, err := time.Parse(time.RFC3339, r.AccessKey2.CreateDate)
+	d2, err := time.Parse(time.RFC3339, r.AccessKeys[1].CreateDate)
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 	if d1.After(d2) {
-		return r.AccessKey1.AccessKeyId, r.AccessKey1.SecretAccessKey, nil
+		return r.AccessKeys[0], nil
 	}
-	return r.AccessKey2.AccessKeyId, r.AccessKey2.SecretAccessKey, nil
+	return r.AccessKeys[1], nil
 }
 
-func ToResponseData(roles []*Role) []string {
-	var output []string
-	for _, role := range roles {
-		output = append(output, role.Name)
+func (r *Role) OldestKeyId() (string, error) {
+	if len(r.AccessKeys) == 1 {
+		return "", nil
 	}
-	return output
+	d1, err := time.Parse(time.RFC3339, r.AccessKeys[0].CreateDate)
+	if err != nil {
+		return "", err
+	}
+	d2, err := time.Parse(time.RFC3339, r.AccessKeys[1].CreateDate)
+	if err != nil {
+		return "", err
+	}
+	if d1.Before(d2) {
+		return r.AccessKeys[0].AccessKeyId, nil
+	}
+	return r.AccessKeys[1].AccessKeyId, nil
+}
+
+func (r *Role) SetAccessKey(oldestKeyId string, key *AccessKey) {
+	if len(r.AccessKeys) < 2 {
+		r.AccessKeys = append(r.AccessKeys, key)
+	} else {
+		if r.AccessKeys[0].AccessKeyId == oldestKeyId {
+			r.AccessKeys[0] = key
+		} else {
+			r.AccessKeys[1] = key
+		}
+	}
 }
